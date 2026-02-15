@@ -26,6 +26,8 @@ const handler = createStatusHandler({
 export const { GET, POST } = handler
 `
 
+const SOURCE_DIRECTIVE = '@source "../node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js";'
+
 function findAppDir(cwd: string): string | null {
   const candidates = [
     join(cwd, 'src', 'app'),
@@ -35,6 +37,43 @@ function findAppDir(cwd: string): string | null {
     if (existsSync(dir)) return dir
   }
   return null
+}
+
+function findGlobalsCss(cwd: string): string | null {
+  const candidates = [
+    join(cwd, 'src', 'app', 'globals.css'),
+    join(cwd, 'app', 'globals.css'),
+    join(cwd, 'styles', 'globals.css'),
+    join(cwd, 'src', 'styles', 'globals.css'),
+  ]
+  for (const path of candidates) {
+    if (existsSync(path)) return path
+  }
+  return null
+}
+
+function injectSourceDirective(cssPath: string): boolean {
+  const content = readFileSync(cssPath, 'utf-8')
+  if (content.includes(SOURCE_DIRECTIVE)) return false
+
+  // Insert after @import "tailwindcss" line
+  const lines = content.split('\n')
+  let insertIndex = -1
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes('@import') && lines[i].includes('tailwindcss')) {
+      insertIndex = i + 1
+      break
+    }
+  }
+
+  if (insertIndex === -1) {
+    // No tailwindcss import found — prepend
+    writeFileSync(cssPath, SOURCE_DIRECTIVE + '\n' + content)
+  } else {
+    lines.splice(insertIndex, 0, SOURCE_DIRECTIVE)
+    writeFileSync(cssPath, lines.join('\n'))
+  }
+  return true
 }
 
 function safeWriteFile(filePath: string, content: string, overwrite: boolean): boolean {
@@ -156,6 +195,20 @@ async function main() {
     console.log(`  Created ${statusRoutePath}`)
   }
 
+  // ── Patch Tailwind v4 CSS ──────────────────────
+  const globalsCss = findGlobalsCss(cwd)
+  if (globalsCss) {
+    if (injectSourceDirective(globalsCss)) {
+      console.log(`  Patched ${globalsCss} (added @source directive for Tailwind v4)`)
+    } else {
+      console.log(`  ${globalsCss} already has @source directive`)
+    }
+  } else {
+    console.log()
+    console.log('  ⚠ Could not find globals.css — add this line manually:')
+    console.log(`    ${SOURCE_DIRECTIVE}`)
+  }
+
   // ── Append to .env.local ──────────────────────
   const envPath = join(cwd, '.env.local')
 
@@ -173,12 +226,20 @@ async function main() {
   console.log()
   console.log('  ── Add to your layout ──────────────────────')
   console.log()
+  console.log("    // Create a client component (e.g., components/FeedbackButton.tsx):")
+  console.log("    'use client'")
+  console.log("    import { useState } from 'react'")
   console.log("    import { FeedbackPanel } from '@nikitadmitrieff/feedback-chat'")
   console.log("    import '@nikitadmitrieff/feedback-chat/styles.css'")
   console.log()
-  console.log('    // In your component:')
-  console.log('    const [open, setOpen] = useState(false)')
-  console.log('    <FeedbackPanel isOpen={open} onToggle={() => setOpen(v => !v)} />')
+  console.log('    export function FeedbackButton() {')
+  console.log('      const [open, setOpen] = useState(false)')
+  console.log('      return <FeedbackPanel isOpen={open} onToggle={() => setOpen(!open)} />')
+  console.log('    }')
+  console.log()
+  console.log('    // Then in your layout.tsx:')
+  console.log("    import { FeedbackButton } from '@/components/FeedbackButton'")
+  console.log('    // Inside <body>: <FeedbackButton />')
   console.log()
   console.log('  Done.')
   console.log()

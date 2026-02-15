@@ -9,16 +9,16 @@ User submits idea → AI chat refines it → GitHub issue → Claude Code agent 
 ## Architecture
 
 ```
-┌─────────────────────────────────────┐
-│  Your Next.js App                   │
-│                                     │
-│  <FeedbackPanel />                  │
-│  import '@feedback-chat/styles.css' │
-│                                     │
-│  API routes (one-liner exports):    │
-│    /api/feedback/chat               │
-│    /api/feedback/status             │
-└──────────────┬──────────────────────┘
+┌─────────────────────────────────────────────┐
+│  Your Next.js App                           │
+│                                             │
+│  <FeedbackPanel />                          │
+│  import '@nikitadmitrieff/feedback-chat/styles.css' │
+│                                             │
+│  API routes (one-liner exports):            │
+│    /api/feedback/chat                       │
+│    /api/feedback/status                     │
+└──────────────┬──────────────────────────────┘
                │
      GitHub Issues + Labels
                │
@@ -35,36 +35,124 @@ User submits idea → AI chat refines it → GitHub issue → Claude Code agent 
 
 ## Quick Start
 
-### 1. Install
+### Option A: Let Claude install it (recommended)
 
-```bash
-npm install @nikitadmitrieff/feedback-chat
-```
+If you use [Claude Code](https://claude.ai/code), just say:
 
-### 2. Run the setup wizard
+> Install @nikitadmitrieff/feedback-chat in my app
+
+Claude will install the package, create your API routes, configure Tailwind, and add the component to your layout. See [`CLAUDE.md`](./CLAUDE.md) for the full installation spec Claude follows.
+
+### Option B: CLI wizard
 
 ```bash
 npx feedback-chat init
 ```
 
-This creates your API routes and configures `.env.local`.
+This creates your API routes, configures `.env.local`, and patches your CSS for Tailwind v4.
 
-### 3. Add to your layout
+### Option C: Manual setup
+
+#### 1. Install the package and peer dependencies
+
+```bash
+npm install @nikitadmitrieff/feedback-chat \
+  @assistant-ui/react @assistant-ui/react-ai-sdk @assistant-ui/react-markdown \
+  ai @ai-sdk/anthropic
+```
+
+> **React version note:** If you're on React 19, you need `react@>=19.1.2` (not 19.1.0 or 19.1.1). The AI SDK's `@ai-sdk/react` intentionally excludes those versions. Run `npm install react@latest react-dom@latest` to update.
+
+#### 2. Configure Tailwind v4
+
+Add this line near the top of your `globals.css` (after `@import "tailwindcss"`):
+
+```css
+@source "../node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js";
+```
+
+This tells Tailwind v4 to scan the widget's compiled components for utility classes. **Without this line, the widget will render unstyled** because Tailwind v4 excludes `node_modules` from automatic content detection.
+
+#### 3. Create the chat API route
+
+Create `app/api/feedback/chat/route.ts` (or `src/app/api/feedback/chat/route.ts`):
+
+```ts
+import { createFeedbackHandler } from '@nikitadmitrieff/feedback-chat/server'
+
+const handler = createFeedbackHandler({
+  password: process.env.FEEDBACK_PASSWORD!,
+  // Optional: GitHub issue creation
+  // github: { token: process.env.GITHUB_TOKEN!, repo: process.env.GITHUB_REPO! },
+})
+
+export const POST = handler.POST
+```
+
+#### 4. Create the status API route
+
+Create `app/api/feedback/status/route.ts`:
+
+```ts
+import { createStatusHandler } from '@nikitadmitrieff/feedback-chat/server'
+
+const handler = createStatusHandler({
+  password: process.env.FEEDBACK_PASSWORD!,
+})
+
+export const { GET, POST } = handler
+```
+
+#### 5. Add FeedbackPanel to your app
+
+Create a **client component** (must have `'use client'`):
 
 ```tsx
+'use client'
+
+import { useState } from 'react'
 import { FeedbackPanel } from '@nikitadmitrieff/feedback-chat'
 import '@nikitadmitrieff/feedback-chat/styles.css'
 
-export default function Layout({ children }) {
+export function FeedbackButton() {
   const [open, setOpen] = useState(false)
 
+  return <FeedbackPanel isOpen={open} onToggle={() => setOpen(!open)} />
+}
+```
+
+Then render it in your layout:
+
+```tsx
+// app/layout.tsx (Server Component — no 'use client' needed here)
+import { FeedbackButton } from '@/components/FeedbackButton'
+
+export default function RootLayout({ children }) {
   return (
-    <>
-      {children}
-      <FeedbackPanel isOpen={open} onToggle={() => setOpen(v => !v)} />
-    </>
+    <html>
+      <body>
+        {children}
+        <FeedbackButton />
+      </body>
+    </html>
   )
 }
+```
+
+#### 6. Environment variables
+
+Add to `.env.local`:
+
+```env
+ANTHROPIC_API_KEY=sk-ant-...       # Required — powers the chat (Haiku by default)
+FEEDBACK_PASSWORD=your-password    # Required — gates access to the chatbot
+
+# Optional — GitHub issue creation
+# GITHUB_TOKEN=ghp_...
+# GITHUB_REPO=owner/repo
+
+# Optional — pipeline agent URL
+# AGENT_URL=https://your-agent.railway.app
 ```
 
 ## Three Tiers
@@ -193,6 +281,36 @@ createFeedbackHandler({
 })
 ```
 
+## Troubleshooting
+
+### Widget renders unstyled / broken layout
+
+**Cause:** Tailwind v4 excludes `node_modules` from automatic content detection, so the widget's utility classes aren't generated.
+
+**Fix:** Add to your `globals.css` (after `@import "tailwindcss"`):
+
+```css
+@source "../node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js";
+```
+
+### npm peer dependency warnings about React
+
+**Cause:** `@ai-sdk/react` intentionally excludes `react@19.1.0` and `19.1.1` due to known issues.
+
+**Fix:** Update React: `npm install react@latest react-dom@latest`
+
+### Widget is invisible / doesn't appear
+
+Make sure you imported the styles: `import '@nikitadmitrieff/feedback-chat/styles.css'`
+
+### 401 errors on chat
+
+Check that `FEEDBACK_PASSWORD` in `.env.local` matches what you enter in the widget's password gate.
+
+### GitHub issues not created
+
+Ensure both `GITHUB_TOKEN` and `GITHUB_REPO` are set in `.env.local` and passed to `createFeedbackHandler({ github: { ... } })`.
+
 ## Conventions (fixed)
 
 These are standardized by the package — convention over configuration:
@@ -231,9 +349,15 @@ feedback-chat/
 
 ## Peer Dependencies
 
+```bash
+npm install @assistant-ui/react @assistant-ui/react-ai-sdk @assistant-ui/react-markdown ai @ai-sdk/anthropic
+```
+
+Required versions:
+
 ```json
 {
-  "react": "^18 || ^19",
+  "react": "^18 || ^19 (19.1.2+ if on React 19)",
   "react-dom": "^18 || ^19",
   "next": ">=14",
   "@assistant-ui/react": ">=0.12",
