@@ -2,16 +2,23 @@
   "name": "@feedback-chat/widget",
   "version": "0.1.0",
   "type": "module",
+  "main": "./dist/client/index.js",
+  "types": "./dist/client/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/client/index.d.ts",
-      "import": "./dist/client/index.js"
+      "import": "./dist/client/index.js",
+      "default": "./dist/client/index.js"
     },
     "./server": {
       "types": "./dist/server/index.d.ts",
-      "import": "./dist/server/index.js"
+      "import": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
     },
-    "./styles.css": "./dist/styles.css"
+    "./styles.css": {
+      "import": "./dist/styles.css",
+      "default": "./dist/styles.css"
+    }
   },
   "bin": {
     "feedback-chat": "./dist/cli/init.js"
