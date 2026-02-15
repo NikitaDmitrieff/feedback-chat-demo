@@ -1,0 +1,20 @@
+{
+  "projectTitle": "@nikitadmitrieff/feedback-chat",
+  "description": "AI-powered feedback chatbot widget for Next.js — turns user ideas into PRs via Claude Code agent",
+  "branch": "main",
+  "folders": [
+    "packages/widget/src",
+    "packages/agent/src"
+  ],
+  "excludeFolders": [
+    "node_modules",
+    "dist",
+    ".turbo"
+  ],
+  "excludeFiles": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "package-lock.json"
+  ],
+  "rules": "This is a Next.js feedback chatbot widget. Key exports: FeedbackPanel (client component), createFeedbackHandler and createStatusHandler (server route factories). Uses AI SDK v6, Assistant UI, and Tailwind v4. Consumer must add @source directive for Tailwind scanning."
+}
