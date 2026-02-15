@@ -1,22 +1,40 @@
 # Quick Start
 
-feedback-chat has **3 tiers** — pick the one that matches your needs:
+## Choose Your Tier
 
-| Tier | What you get | Required env vars |
-|------|-------------|-------------------|
-| **Chat only** | AI conversations in a side panel, localStorage persistence | `ANTHROPIC_API_KEY`, `FEEDBACK_PASSWORD` |
-| **+ GitHub** | Chat + automatic GitHub issue creation with link shown in chat | + `GITHUB_TOKEN`, `GITHUB_REPO` |
-| **+ Pipeline** | Chat + GitHub + autonomous agent writes code → PR → preview → approve/reject in widget | + `CLAUDE_CREDENTIALS_JSON` or `ANTHROPIC_API_KEY` (agent), `AGENT_URL`, Railway/Docker deployment |
+Pick your tier first, then follow the matching setup path.
+
+| Tier | What you get | Cost | What you need |
+|------|-------------|------|---------------|
+| **Chat only** | AI conversations, localStorage persistence | ~$0.01/conversation | API key + password |
+| **+ GitHub** | Chat + auto-creates GitHub issues from feedback | same | + GitHub token/repo |
+| **+ Pipeline** | Chat + GitHub + agent writes code → PR → preview → approve in widget | + ~$5/mo Railway | + Claude Max + Railway |
+
+**If you have Claude Max ($200/mo), you get unlimited feedback-to-code automation for the cost of a ~$5/mo Railway instance.**
+
+## Pre-Flight Check
+
+`@ai-sdk/react` explicitly excludes `react@19.1.0` and `19.1.1`. This is a **build breaker**. Check your version:
+
+```bash
+npm ls react
+```
+
+If you're on 19.1.0 or 19.1.1, upgrade first:
+
+```bash
+npm install react@latest react-dom@latest
+```
 
 ## Installation
 
-### Option A: Let Claude install it
+### Option A: Let Claude install it (recommended)
 
 If you use Claude Code, just say:
 
-> Install @nikitadmitrieff/feedback-chat in my app
+> Install @nikitadmitrieff/feedback-chat in my app — I want the [Chat / +GitHub / +Pipeline] tier
 
-Claude will install the package, create API routes, configure Tailwind, and add the component.
+Claude reads the CLAUDE.md in this repo and follows the tier-specific setup steps.
 
 ### Option B: CLI wizard
 
@@ -24,29 +42,15 @@ Claude will install the package, create API routes, configure Tailwind, and add 
 npx feedback-chat init
 ```
 
-Detects your Next.js app structure, prompts for env vars, creates routes, and patches your CSS.
+Creates API routes, configures `.env.local`, and patches your CSS for Tailwind v4.
 
 ### Option C: Manual setup
 
-```bash
-npm install @nikitadmitrieff/feedback-chat \
-  @assistant-ui/react @assistant-ui/react-ai-sdk @assistant-ui/react-markdown \
-  ai @ai-sdk/anthropic
-```
-
-Then follow one of the tier-specific guides:
+Follow the tier-specific guide:
 
 - [Chat only setup](./chat-only-setup.md)
 - [GitHub integration](./github-integration.md)
 - [Pipeline setup](./pipeline-setup.md)
-
-## React version note
-
-If you're on React 19, you need `react@>=19.1.2` (not 19.1.0 or 19.1.1). The AI SDK's `@ai-sdk/react` intentionally excludes those versions:
-
-```bash
-npm install react@latest react-dom@latest
-```
 
 ## Peer dependencies
 
@@ -62,3 +66,13 @@ npm install react@latest react-dom@latest
   "@ai-sdk/anthropic": ">=1"
 }
 ```
+
+## Verification
+
+After setup, verify it works:
+
+1. Run `npm run dev`
+2. Open the app — you should see a feedback trigger bar at the bottom-center
+3. Click it, enter your feedback password, send a message
+4. **(+ GitHub)** Submit feedback and check the repo's Issues tab for a new issue
+5. **(+ Pipeline)** The PipelineTracker should show stage progression through to `preview_ready`

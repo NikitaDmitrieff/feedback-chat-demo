@@ -6,6 +6,18 @@ AI-powered feedback chatbot that turns user ideas into code — from chat to PR,
 User submits idea → AI chat refines it → GitHub issue → Claude Code agent implements → PR opened → preview deployed → user approves in widget
 ```
 
+## Choose Your Tier
+
+Pick your tier first, then follow the matching setup path below.
+
+| Tier | What you get | Cost | What you need |
+|------|-------------|------|---------------|
+| **Chat only** | AI conversations, localStorage persistence | ~$0.01/conversation | API key + password |
+| **+ GitHub** | Chat + auto-creates GitHub issues from feedback | same | + GitHub token/repo |
+| **+ Pipeline** | Chat + GitHub + agent writes code → PR → preview → approve in widget | + ~$5/mo Railway | + Claude Max + Railway |
+
+**If you have Claude Max ($200/mo), you get unlimited feedback-to-code automation for the cost of a ~$5/mo Railway instance.**
+
 ## Architecture
 
 ```
@@ -33,13 +45,25 @@ User submits idea → AI chat refines it → GitHub issue → Claude Code agent 
 └──────────────────────────────────────┘
 ```
 
+## Pre-Flight Check
+
+> **React 19 users: this is a build breaker, not a footnote.**
+>
+> `@ai-sdk/react` explicitly excludes `react@19.1.0` and `19.1.1`. If you're on either version, upgrade first:
+>
+> ```bash
+> npm install react@latest react-dom@latest
+> ```
+>
+> Check your version: `npm ls react`
+
 ## Quick Start
 
 ### Option A: Let Claude install it (recommended)
 
 If you use [Claude Code](https://claude.ai/code), just say:
 
-> Install @nikitadmitrieff/feedback-chat in my app
+> Install @nikitadmitrieff/feedback-chat in my app — I want the [Chat / +GitHub / +Pipeline] tier
 
 Claude will install the package, create your API routes, configure Tailwind, and add the component to your layout. See [`CLAUDE.md`](./CLAUDE.md) for the full installation spec Claude follows.
 
@@ -53,7 +77,13 @@ This creates your API routes, configures `.env.local`, and patches your CSS for 
 
 ### Option C: Manual setup
 
-#### 1. Install the package and peer dependencies
+Pick your tier and follow the steps below.
+
+---
+
+## Chat Only Setup
+
+### 1. Install the package and peer dependencies
 
 ```bash
 npm install @nikitadmitrieff/feedback-chat \
@@ -61,9 +91,7 @@ npm install @nikitadmitrieff/feedback-chat \
   ai @ai-sdk/anthropic
 ```
 
-> **React version note:** If you're on React 19, you need `react@>=19.1.2` (not 19.1.0 or 19.1.1). The AI SDK's `@ai-sdk/react` intentionally excludes those versions. Run `npm install react@latest react-dom@latest` to update.
-
-#### 2. Configure Tailwind v4
+### 2. Configure Tailwind v4
 
 Add this line near the top of your `globals.css` (after `@import "tailwindcss"`):
 
@@ -71,9 +99,9 @@ Add this line near the top of your `globals.css` (after `@import "tailwindcss"`)
 @source "../node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js";
 ```
 
-This tells Tailwind v4 to scan the widget's compiled components for utility classes. **Without this line, the widget will render unstyled** because Tailwind v4 excludes `node_modules` from automatic content detection.
+**This is mandatory.** Tailwind v4 excludes `node_modules` from automatic content detection. Without this line, the widget will render completely unstyled.
 
-#### 3. Create the chat API route
+### 3. Create the chat API route
 
 Create `app/api/feedback/chat/route.ts` (or `src/app/api/feedback/chat/route.ts`):
 
@@ -82,14 +110,12 @@ import { createFeedbackHandler } from '@nikitadmitrieff/feedback-chat/server'
 
 const handler = createFeedbackHandler({
   password: process.env.FEEDBACK_PASSWORD!,
-  // Optional: GitHub issue creation
-  // github: { token: process.env.GITHUB_TOKEN!, repo: process.env.GITHUB_REPO! },
 })
 
 export const POST = handler.POST
 ```
 
-#### 4. Create the status API route
+### 4. Create the status API route
 
 Create `app/api/feedback/status/route.ts`:
 
@@ -103,7 +129,7 @@ const handler = createStatusHandler({
 export const { GET, POST } = handler
 ```
 
-#### 5. Add FeedbackPanel to your app
+### 5. Add FeedbackPanel to your app
 
 Create a **client component** (must have `'use client'`):
 
@@ -139,29 +165,226 @@ export default function RootLayout({ children }) {
 }
 ```
 
-#### 6. Environment variables
+### 6. Environment variables
 
 Add to `.env.local`:
 
 ```env
 ANTHROPIC_API_KEY=sk-ant-...       # Required — powers the chat (Haiku by default)
 FEEDBACK_PASSWORD=your-password    # Required — gates access to the chatbot
-
-# Optional — GitHub issue creation
-# GITHUB_TOKEN=ghp_...
-# GITHUB_REPO=owner/repo
-
-# Optional — pipeline agent URL
-# AGENT_URL=https://your-agent.railway.app
 ```
 
-## Three Tiers
+### 7. Verify
 
-| Tier | What you get | Setup |
-|------|-------------|-------|
-| **Chat only** | AI conversations, localStorage persistence | API key + password |
-| **+ GitHub** | Issues created automatically, link shown in chat | + GitHub token/repo |
-| **+ Pipeline** | Agent writes code → PR → preview → approve/reject in widget | + Claude Max OAuth + Railway |
+1. Run `npm run dev`
+2. Open the app — you should see a feedback trigger bar at the bottom-center
+3. Click it, enter your feedback password, send a message
+4. The AI should respond and you can have a conversation
+
+---
+
+## + GitHub Setup
+
+Follow all steps from Chat Only, then apply these changes:
+
+### Update the chat API route
+
+```ts
+import { createFeedbackHandler } from '@nikitadmitrieff/feedback-chat/server'
+
+const handler = createFeedbackHandler({
+  password: process.env.FEEDBACK_PASSWORD!,
+  github: {
+    token: process.env.GITHUB_TOKEN!,
+    repo: process.env.GITHUB_REPO!,
+  },
+})
+
+export const POST = handler.POST
+```
+
+### Update the status API route
+
+```ts
+import { createStatusHandler } from '@nikitadmitrieff/feedback-chat/server'
+
+const handler = createStatusHandler({
+  password: process.env.FEEDBACK_PASSWORD!,
+  github: {
+    token: process.env.GITHUB_TOKEN!,
+    repo: process.env.GITHUB_REPO!,
+  },
+})
+
+export const { GET, POST } = handler
+```
+
+### Create required GitHub labels
+
+The package uses specific labels to track pipeline state. Create them on your repo:
+
+```bash
+gh label create feedback-bot --color 0E8A16 --description "Created by feedback widget"
+gh label create auto-implement --color 1D76DB --description "Agent should implement this"
+gh label create in-progress --color FBCA04 --description "Agent is working on this"
+gh label create agent-failed --color D93F0B --description "Agent build/lint failed"
+gh label create preview-pending --color C5DEF5 --description "PR ready, preview deploying"
+gh label create rejected --color E4E669 --description "User rejected changes"
+```
+
+### Additional environment variables
+
+```env
+GITHUB_TOKEN=ghp_...              # Needs 'repo' scope
+GITHUB_REPO=owner/repo            # e.g. nikitadmitrieff/my-app
+```
+
+### Verify
+
+1. Open the widget, have a conversation, submit feedback
+2. Check your repo's Issues tab — a new issue should appear with `feedback-bot` and `auto-implement` labels
+3. The issue body should contain a `## Generated Prompt` code block
+
+---
+
+## + Pipeline Setup
+
+Follow all steps from + GitHub, then apply these changes:
+
+### Update the status API route with agentUrl
+
+```ts
+import { createStatusHandler } from '@nikitadmitrieff/feedback-chat/server'
+
+const handler = createStatusHandler({
+  password: process.env.FEEDBACK_PASSWORD!,
+  github: {
+    token: process.env.GITHUB_TOKEN!,
+    repo: process.env.GITHUB_REPO!,
+  },
+  agentUrl: process.env.AGENT_URL,
+})
+
+export const { GET, POST } = handler
+```
+
+### Deploy the agent service
+
+The agent is a separate Fastify server that processes GitHub webhooks. **npm consumers don't have it** — you need to clone it separately.
+
+#### Railway (recommended)
+
+1. Clone the agent:
+
+```bash
+git clone https://github.com/NikitaDmitrieff/feedback-chat
+cd feedback-chat/packages/agent
+```
+
+2. Install Railway CLI and login:
+
+```bash
+npm install -g @railway/cli
+railway login
+```
+
+3. Create a Railway project:
+
+```bash
+railway init
+```
+
+4. Set environment variables:
+
+```bash
+railway variables set GITHUB_TOKEN=ghp_...
+railway variables set GITHUB_REPO=owner/repo
+railway variables set WEBHOOK_SECRET=$(openssl rand -hex 32)
+
+# Claude authentication — choose one:
+# Option A: Max subscription (recommended, $0/run)
+railway variables set CLAUDE_CREDENTIALS_JSON='{"claudeAiOauth":{"accessToken":"...","refreshToken":"...","expiresAt":...}}'
+# Option B: API key fallback (pay per token)
+railway variables set ANTHROPIC_API_KEY=sk-ant-...
+```
+
+5. Deploy:
+
+```bash
+railway up
+```
+
+6. Get your agent URL:
+
+```bash
+railway domain
+```
+
+Save this URL — you need it for the webhook and `AGENT_URL` env var.
+
+#### Docker
+
+```bash
+cd packages/agent
+docker build -t feedback-agent .
+docker run -p 3000:3000 --env-file .env feedback-agent
+```
+
+### Configure GitHub webhook
+
+1. Go to your repo → **Settings** → **Webhooks** → **Add webhook**
+2. **Payload URL:** `https://<your-agent>.railway.app/webhook/github`
+3. **Content type:** `application/json`
+4. **Secret:** same value as your `WEBHOOK_SECRET` env var
+5. **Events:** Select "Let me select individual events" → check **Issues** only
+6. Click **Add webhook**
+
+Or automate it:
+
+```bash
+gh api repos/OWNER/REPO/hooks \
+  -f url="https://your-agent.railway.app/webhook/github" \
+  -f content_type=json \
+  -f secret="YOUR_WEBHOOK_SECRET" \
+  -f 'events[]=issues'
+```
+
+### Additional environment variable
+
+Add to your **app's** `.env.local`:
+
+```env
+AGENT_URL=https://your-agent.railway.app
+```
+
+### Agent environment variables (full reference)
+
+Set these on your **agent service** (Railway/Docker):
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GITHUB_TOKEN` | Yes | — | GitHub token (`repo` + `workflow` scopes) |
+| `GITHUB_REPO` | Yes | — | Target repository (`owner/name`) |
+| `WEBHOOK_SECRET` | Yes | — | Random string for webhook HMAC verification |
+| `CLAUDE_CREDENTIALS_JSON` | One of | — | Max subscription OAuth credentials ($0/run) |
+| `ANTHROPIC_API_KEY` | One of | — | API key fallback (pay per token) |
+| `AGENT_INSTALL_CMD` | No | `npm ci` | Install command |
+| `AGENT_BUILD_CMD` | No | `npm run build` | Build command |
+| `AGENT_LINT_CMD` | No | `npm run lint` | Lint command |
+| `AGENT_CLAUDE_TIMEOUT_MS` | No | `900000` (15 min) | Claude CLI timeout |
+| `AGENT_JOB_BUDGET_MS` | No | `1500000` (25 min) | Total job time budget |
+| `AGENT_ENV_FORWARD` | No | `NEXT_PUBLIC_*` | Comma-separated env var patterns to forward |
+| `PORT` | No | `3000` | Fastify server port |
+
+### Verify
+
+1. Check the agent is running: `curl https://your-agent.railway.app/health`
+2. Submit feedback through the widget — an issue should be created
+3. The PipelineTracker should show stage progression: created → queued → running → validating → preview_ready
+4. At `preview_ready`, you should see approve/reject/request changes buttons
+5. Click approve — the PR should be merged
+
+---
 
 ## Configuration
 
@@ -178,9 +401,11 @@ createFeedbackHandler({
   password: process.env.FEEDBACK_PASSWORD!,
   model: anthropic('claude-haiku-4-5-20251001'),
   systemPrompt: 'Your custom prompt...',
+  projectContext: 'E-commerce platform with cart and checkout.',
   github: {
     token: process.env.GITHUB_TOKEN!,
     repo: process.env.GITHUB_REPO!,
+    labels: ['enhancement'],  // extra labels beyond feedback-bot + auto-implement
   },
 })
 ```
@@ -196,54 +421,6 @@ createFeedbackHandler({
   onToggle={() => setOpen(v => !v)}
   apiUrl="/api/feedback/chat"
 />
-```
-
-### Agent — Environment variables
-
-```env
-# Required
-GITHUB_TOKEN=ghp_...
-GITHUB_REPO=owner/repo
-WEBHOOK_SECRET=random-secret
-
-# Claude authentication (choose one)
-CLAUDE_CREDENTIALS_JSON=   # Max subscription (recommended, $0/run)
-ANTHROPIC_API_KEY=         # API key fallback (pay per token)
-
-# Optional
-AGENT_INSTALL_CMD=npm ci
-AGENT_BUILD_CMD=npm run build
-AGENT_LINT_CMD=npm run lint
-```
-
-## Cost
-
-| Component | Cost | Auth method |
-|-----------|------|-------------|
-| Chat (Haiku) | ~$0.01/conversation | `ANTHROPIC_API_KEY` |
-| Code agent | $0/implementation | Claude Max OAuth |
-| Railway | ~$5/month (sleeps when idle) | Railway token |
-| Vercel previews | Free (hobby) or included in Pro | Existing Vercel setup |
-
-**If you have Claude Max ($200/mo), you get unlimited feedback-to-code automation for the cost of a ~$5/mo Railway instance.**
-
-## Self-Hosting the Agent
-
-The agent service lives in `packages/agent/`. Deploy it anywhere that runs Docker:
-
-### Railway (recommended)
-
-1. Fork this repo
-2. Create a new Railway project from the `packages/agent/` directory
-3. Set the environment variables (see `packages/agent/.env.example`)
-4. Create a GitHub webhook pointing to `https://your-app.railway.app/webhook/github`
-
-### Docker
-
-```bash
-cd packages/agent
-docker build -t feedback-agent .
-docker run -p 3000:3000 --env-file .env feedback-agent
 ```
 
 ## Customization
@@ -283,6 +460,12 @@ createFeedbackHandler({
 
 ## Troubleshooting
 
+### `Tooltip must be used within TooltipProvider`
+
+**Cause:** Versions `<=0.1.1` didn't wrap the component tree with `TooltipProvider`. Fixed in `0.1.2+`.
+
+**Fix:** Update the package: `npm install @nikitadmitrieff/feedback-chat@latest`
+
 ### Widget renders unstyled / broken layout
 
 **Cause:** Tailwind v4 excludes `node_modules` from automatic content detection, so the widget's utility classes aren't generated.
@@ -310,6 +493,17 @@ Check that `FEEDBACK_PASSWORD` in `.env.local` matches what you enter in the wid
 ### GitHub issues not created
 
 Ensure both `GITHUB_TOKEN` and `GITHUB_REPO` are set in `.env.local` and passed to `createFeedbackHandler({ github: { ... } })`.
+
+### Pipeline stuck at "queued"
+
+- Check agent is running: `curl https://your-agent.railway.app/health`
+- Check GitHub webhook is configured (Issues events, correct secret)
+- Check agent logs for signature verification errors
+
+### Pipeline stuck at "validating"
+
+- The agent is building and linting — check agent logs
+- After 25 minutes the job budget expires — check for `agent-failed` label
 
 ## Conventions (fixed)
 

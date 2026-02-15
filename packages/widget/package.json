@@ -1,6 +1,6 @@
 {
   "name": "@nikitadmitrieff/feedback-chat",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "main": "./dist/client/index.js",
   "types": "./dist/client/index.d.ts",
@@ -23,7 +23,7 @@
   "bin": {
     "feedback-chat": "./dist/cli/init.js"
   },
-  "files": ["dist"],
+  "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsup && cp src/client/styles.css dist/styles.css",
     "dev": "tsup --watch",
