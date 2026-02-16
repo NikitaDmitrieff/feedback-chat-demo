@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { generateApiKey } from '@/lib/api-keys'
 import crypto from 'node:crypto'
-import { Nav } from '@/components/nav'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
@@ -47,9 +46,7 @@ export default function NewProjectPage() {
   }
 
   return (
-    <>
-      <Nav />
-      <div className="mx-auto max-w-lg px-6 pt-24 pb-16">
+    <div className="mx-auto max-w-lg px-6 pt-10 pb-16">
         <Link
           href="/projects"
           className="mb-6 inline-flex items-center gap-1.5 text-xs text-muted transition-colors hover:text-fg"
@@ -114,7 +111,6 @@ export default function NewProjectPage() {
             </button>
           </form>
         </div>
-      </div>
-    </>
+    </div>
   )
 }
