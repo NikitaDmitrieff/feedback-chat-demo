@@ -81,7 +81,7 @@ In your GitHub repo settings, create a webhook:
 - **URL:** `https://your-agent.railway.app/webhook/github`
 - **Content type:** `application/json`
 - **Secret:** same as `WEBHOOK_SECRET` env var on the agent
-- **Events:** Issues only
+- **Events:** Issues only (handles `opened`, `reopened`, and `labeled` actions — toggling `auto-implement` re-triggers the pipeline)
 
 ## User actions in the widget
 
@@ -105,6 +105,8 @@ When you set `CLAUDE_CREDENTIALS_JSON`, the agent:
 4. Strips `ANTHROPIC_API_KEY` from the env so the CLI can't fall back to API billing
 
 This is the only way to use Max OAuth in headless Docker — the credentials file approach doesn't work because containers lack system keychains. The Dockerfile also writes `{"hasCompletedOnboarding": true}` to `~/.claude.json` (required workaround for [anthropics/claude-code#8938](https://github.com/anthropics/claude-code/issues/8938)).
+
+> **Tokens expire.** If the agent fails with `authentication_error` or `invalid_grant`, run `cd packages/agent && npm run credentials` to extract fresh tokens from your macOS keychain and redeploy.
 
 ## Cost
 

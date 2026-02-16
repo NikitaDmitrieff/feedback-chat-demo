@@ -20,7 +20,7 @@ packages/
 │       ├── client/   # React components (FeedbackPanel, PipelineTracker, Thread)
 │       ├── server/   # Route handler factories (createFeedbackHandler, createStatusHandler)
 │       └── cli/      # npx setup wizard
-├── agent/     # Deployable Fastify service (clone → Claude CLI → validate → PR)
+├── agent/     # Managed worker — polls Supabase job_queue, runs Claude CLI → validate → PR
 └── dashboard/ # Next.js dashboard with project management + feedback intelligence hub
 ```
 
@@ -251,6 +251,8 @@ VERCEL_AUTOMATION_BYPASS_SECRET=...# Recommended — see Step 8b
 
 ### Step 8b: Configure Vercel preview bypass (+ GitHub and + Pipeline)
 
+> **WARNING: Vercel SSO protection blocks webhook deliveries.** If your Vercel project uses team SSO, `*.vercel.app` URLs return 401 for all unauthenticated requests — including GitHub webhooks. Use a **custom domain** to bypass SSO protection.
+
 **This step is required if your Vercel project has Deployment Protection enabled** (on by default for Pro/Enterprise plans). Without it, preview URLs in the widget return 401 and users can't see the agent's changes.
 
 1. Go to your Vercel project → **Settings** → **Deployment Protection**
@@ -290,12 +292,20 @@ The agent needs Claude Code CLI to implement changes. Two options:
 
 **Option A: Claude Max subscription (recommended, $0/run)**
 
-Extract your OAuth credentials from the Claude Code CLI keychain entry. On macOS:
+Extract and validate your OAuth credentials using the built-in script:
 ```bash
-security find-generic-password -s "Claude Code-credentials" -a "$USER" -w
+cd packages/agent
+npm run credentials
 ```
 
-> **Note:** `~/.claude/.credentials.json` is written by the *agent inside Docker* from `CLAUDE_CREDENTIALS_JSON` — it does NOT exist on your local machine. Use the keychain command above.
+This reads from the macOS keychain, tests the refresh token against Anthropic's OAuth endpoint, and prints a fresh `CLAUDE_CREDENTIALS_JSON` to stdout. Pipe-friendly:
+```bash
+npm run credentials 2>/dev/null | pbcopy   # copy to clipboard
+```
+
+> **OAuth tokens expire.** If the agent fails with `authentication_error` or `invalid_grant`, re-run `npm run credentials` to get fresh tokens and update the agent's env vars.
+
+> **Note:** `~/.claude/.credentials.json` is written by the *agent inside Docker* from `CLAUDE_CREDENTIALS_JSON` — it does NOT exist on your local machine.
 
 Set `CLAUDE_CREDENTIALS_JSON`. The agent uses `CLAUDE_CODE_OAUTH_TOKEN` internally to authenticate the CLI in headless Docker — this requires the Dockerfile to include `{"hasCompletedOnboarding": true}` in `~/.claude.json` (already configured).
 
@@ -356,7 +366,7 @@ docker run -p 3000:3000 --env-file .env feedback-agent
 2. **Payload URL:** `https://<your-agent>.railway.app/webhook/github`
 3. **Content type:** `application/json`
 4. **Secret:** same value as `WEBHOOK_SECRET` on the agent
-5. **Events:** Select "Let me select individual events" → check **Issues** only
+5. **Events:** Select "Let me select individual events" → check **Issues** only (the handler accepts `opened`, `reopened`, and `labeled` actions)
 6. Click **Add webhook**
 
 Or automate (**note the `config[content_type]=json` — without it, GitHub sends `form-urlencoded` and the agent returns 415**):
@@ -441,9 +451,12 @@ Add this section to the consumer project's CLAUDE.md:
 - For + Pipeline: `agentUrl` must be passed to `createStatusHandler` or the tracker can't check agent status
 - GitHub labels must be created on the consumer's repo before the pipeline can function
 - `GITHUB_TOKEN` must be a PAT (`ghp_` prefix). OAuth tokens (`gho_`) expire after ~8 hours and will silently break issue creation
-- The agent Dockerfile uses a multi-stage build — `dist/` is NOT expected pre-built, it compiles in the builder stage
+- The agent Dockerfile uses a multi-stage build — `dist/` is NOT expected pre-built, it compiles in the builder stage. The CMD is `managed-worker.js` (polls Supabase job_queue), NOT `server.js` (standalone Fastify)
 - The agent runs as a non-root `agent` user — Claude Code CLI refuses `--dangerously-skip-permissions` as root
 - The agent uses `CLAUDE_CODE_OAUTH_TOKEN` env var (not credentials file) to authenticate the CLI in headless Docker. This requires `~/.claude.json` with `{"hasCompletedOnboarding": true}` (see [anthropics/claude-code#8938](https://github.com/anthropics/claude-code/issues/8938))
+- Claude Max OAuth tokens expire — if the agent fails with `authentication_error` or `invalid_grant`, run `cd packages/agent && npm run credentials` to extract fresh tokens and update the deployment
+- Vercel team SSO protection blocks `*.vercel.app` webhook URLs with 401 — use a custom domain to bypass it
+- The webhook handler accepts `labeled` events (when `auto-implement` is added), so users can re-trigger by toggling the label — not just `opened`/`reopened`
 - When creating GitHub webhooks via `gh api`, you MUST use `config[content_type]=json` — the default is `form-urlencoded` which the Fastify agent rejects with 415
 - When creating GitHub webhooks via `gh api`, use `-F active=true` (capital F) — lowercase `-f` sends the string `"true"` and GitHub returns 422
 - `ANTHROPIC_API_KEY` is required in the consumer's `.env.local` — the AI chat handler reads it from the environment to create the Anthropic client

@@ -213,13 +213,20 @@ railway domain
 
 #### Getting Claude Max credentials
 
-If you chose Max OAuth, extract credentials from your local keychain (macOS):
+If you chose Max OAuth, extract and validate credentials using the built-in script:
 
 ```bash
-security find-generic-password -s "Claude Code-credentials" -a "$USER" -w
+cd packages/agent
+npm run credentials
 ```
 
-Copy the JSON output and pass it as `CLAUDE_CREDENTIALS_JSON`. The agent handles token refresh automatically.
+This reads from your macOS keychain, validates the refresh token, and prints fresh `CLAUDE_CREDENTIALS_JSON` to stdout. Copy and pass it to Railway:
+
+```bash
+npm run credentials 2>/dev/null | pbcopy   # then paste into railway variables set
+```
+
+> **Tokens expire.** If the agent fails with `authentication_error`, re-run `npm run credentials` to get fresh tokens.
 
 ### Option B: Docker
 
@@ -250,7 +257,9 @@ gh api repos/OWNER/REPO/hooks \
 
 > `config[content_type]=json` is required. The default (`form-urlencoded`) causes 415 errors.
 
-**Without `gh` CLI:** Go to your repo Settings > Webhooks > Add webhook. Set the payload URL to `https://YOUR-AGENT-URL/webhook/github`, content type to `application/json`, the secret to your `WEBHOOK_SECRET`, and select only **Issues** events.
+**Without `gh` CLI:** Go to your repo Settings > Webhooks > Add webhook. Set the payload URL to `https://YOUR-AGENT-URL/webhook/github`, content type to `application/json`, the secret to your `WEBHOOK_SECRET`, and select only **Issues** events. The handler accepts `opened`, `reopened`, and `labeled` actions — so you can re-trigger the pipeline by toggling the `auto-implement` label.
+
+> **Vercel SSO warning:** If your Vercel project uses team SSO, `*.vercel.app` URLs return 401 for all unauthenticated requests (including webhooks). Use a custom domain to bypass this.
 
 ### Finish up
 
@@ -371,6 +380,9 @@ That's it. No `statusUrl`, no `apiUrl` configuration needed — it defaults to `
 | Webhook returns 415 | Wrong content type | Recreate webhook with `config[content_type]=json` |
 | `railway variables set` fails | Service not linked | Run `railway up --detach` first, then `railway service link <name>` |
 | Agent: "Not logged in" | OAuth not configured | Set `CLAUDE_CREDENTIALS_JSON`, ensure Dockerfile has `hasCompletedOnboarding` |
+| Agent: "OAuth token expired" | Refresh token expired | Run `cd packages/agent && npm run credentials` to get fresh tokens, redeploy |
+| Webhook returns 401 on Vercel | Team SSO blocks `*.vercel.app` | Add a custom domain to your Vercel project |
+| Webhook 200 but no action | `labeled` event ignored | Update to latest — handler now accepts `labeled` with `auto-implement` |
 | Agent: "cannot use root" | Docker running as root | Dockerfile must create and switch to a non-root user |
 
 See [docs/troubleshooting.md](./docs/troubleshooting.md) for detailed solutions.

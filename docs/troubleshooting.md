@@ -101,6 +101,37 @@ The agent uses `CLAUDE_CODE_OAUTH_TOKEN` (not the credentials file) to authentic
 
 See [anthropics/claude-code#8938](https://github.com/anthropics/claude-code/issues/8938) for the onboarding workaround.
 
+## Agent fails: "OAuth token has expired" or "invalid_grant"
+
+**Cause:** The Claude Max OAuth refresh token has expired or been rotated. Refresh tokens have a limited lifetime — if the agent hasn't run in a while, both the access token and refresh token may be invalid.
+
+**Fix:**
+```bash
+cd packages/agent
+npm run credentials
+```
+
+This extracts fresh credentials from your macOS keychain, validates them with a test refresh, and prints the JSON to stdout. Then update your deployment:
+```bash
+# Railway:
+npm run credentials 2>/dev/null | xargs -I{} railway variables set "CLAUDE_CREDENTIALS_JSON={}"
+
+# Or copy to clipboard and paste manually:
+npm run credentials 2>/dev/null | pbcopy
+```
+
+## Webhook returns 200 but agent doesn't pick up the issue
+
+**Cause:** The webhook handler returns `200 { status: "ignored" }` for events it doesn't process. If you re-triggered by toggling a label (not by closing/reopening the issue), and the handler only accepted `opened`/`reopened`, the `labeled` event was silently ignored.
+
+**Fix:** As of commit 07b3175, the webhook handler also accepts `labeled` events when the `auto-implement` label is present. Update to the latest version. To re-trigger: remove the `auto-implement` label, then re-add it.
+
+## Webhook returns 401 on Vercel
+
+**Cause:** Vercel team SSO protection blocks all unauthenticated requests to `*.vercel.app` URLs — including GitHub webhook deliveries. The webhook handler itself would return 403 (invalid signature) or 404 (project not found), never 401.
+
+**Fix:** Add a custom domain to your Vercel project. Custom domains bypass SSO protection. Update the webhook URL and `APP_URL` env var to use the custom domain.
+
 ## Webhook returns 415 (Unsupported Media Type)
 
 The webhook was created with `application/x-www-form-urlencoded` content type instead of `application/json`. Fix it:

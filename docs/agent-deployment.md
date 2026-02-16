@@ -1,15 +1,21 @@
 # Agent Deployment
 
-The agent service lives in `packages/agent/`. It's a Fastify server that receives GitHub webhooks and uses Claude Code CLI to implement feedback.
+The agent service lives in `packages/agent/`. It's a managed worker that polls a Supabase job queue for work and uses Claude Code CLI to implement feedback.
 
 ## Architecture
 
+There are two modes:
+
+- **Managed mode** (`managed-worker.js`, default): Polls Supabase `job_queue` table every 5 seconds. Used with the dashboard — webhooks go to the dashboard, which enqueues jobs.
+- **Standalone mode** (`server.js`): Fastify server that receives GitHub webhooks directly. For setups without the dashboard.
+
 ```
-GitHub webhook (issue opened/reopened)
+Dashboard webhook (issue opened/reopened/labeled with auto-implement)
   → Verify HMAC-SHA256 signature
   → Check labels (needs 'feedback-bot')
-  → Add to queue (max 5 jobs)
-  → Process sequentially:
+  → Insert into Supabase job_queue
+  → Managed worker polls and claims job
+  → Process:
       1. Parse issue body (extract prompt)
       2. Clone repo (shallow)
       3. Install dependencies
@@ -138,10 +144,13 @@ The `CLAUDE_CODE_OAUTH_TOKEN` env var is the only way to authenticate Claude Cod
 
 **To get your credentials JSON** (on macOS with Claude Code installed):
 ```bash
-security find-generic-password -s "Claude Code-credentials" -a "YOUR_USERNAME" -w
+cd packages/agent
+npm run credentials
 ```
 
-Extract the `claudeAiOauth` portion (accessToken, refreshToken, expiresAt).
+This extracts from the macOS keychain, validates the refresh token against Anthropic's OAuth endpoint, and prints a fresh JSON to stdout. Pipe-friendly: `npm run credentials 2>/dev/null | pbcopy`
+
+> **Tokens expire.** If the agent fails with `authentication_error` or `invalid_grant`, re-run `npm run credentials` to get fresh tokens and redeploy.
 
 ### Optional
 
@@ -172,7 +181,7 @@ Create a webhook on your consumer repo (not the feedback-chat repo):
 2. **Payload URL:** `https://your-agent.railway.app/webhook/github`
 3. **Content type:** `application/json` (**critical** — `form-urlencoded` causes 415 errors)
 4. **Secret:** same value as `WEBHOOK_SECRET`
-5. **Events:** Select "Let me select individual events" → check **Issues** only
+5. **Events:** Select "Let me select individual events" → check **Issues** only (the handler accepts `opened`, `reopened`, and `labeled` actions — `labeled` allows re-triggering by toggling the `auto-implement` label)
 
 Or via CLI (**note `config[content_type]=json`** — without it GitHub defaults to form-urlencoded):
 
