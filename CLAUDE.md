@@ -43,7 +43,7 @@ When asked to install this widget in a Next.js app, follow these steps exactly.
 
 ### Step 0: Choose a tier
 
-**Ask the user which tier they want before proceeding.** There are three tiers:
+**ALWAYS ask the user which tier they want before proceeding.** Do NOT infer the tier from env vars — the user may have GitHub credentials for other purposes. There are three tiers:
 
 | Tier | What you get | What you need |
 |------|-------------|---------------|
@@ -205,16 +205,18 @@ FEEDBACK_PASSWORD=your-password    # Required
 ```env
 ANTHROPIC_API_KEY=sk-ant-...       # Required
 FEEDBACK_PASSWORD=your-password    # Required
-GITHUB_TOKEN=ghp_...              # Needs 'repo' scope
+GITHUB_TOKEN=ghp_...              # MUST be a PAT (ghp_ prefix), NOT an OAuth token (gho_)
 GITHUB_REPO=owner/repo            # e.g. nikitadmitrieff/my-app
 ```
+
+**IMPORTANT: `GITHUB_TOKEN` must start with `ghp_` (Personal Access Token).** Tokens starting with `gho_` are short-lived GitHub OAuth tokens that expire after ~8 hours. Generate a PAT at https://github.com/settings/tokens/new with `repo` + `workflow` scopes.
 
 **+ Pipeline:**
 
 ```env
 ANTHROPIC_API_KEY=sk-ant-...       # Required
 FEEDBACK_PASSWORD=your-password    # Required
-GITHUB_TOKEN=ghp_...              # Needs 'repo' scope
+GITHUB_TOKEN=ghp_...              # MUST be a PAT (ghp_ prefix)
 GITHUB_REPO=owner/repo            # e.g. nikitadmitrieff/my-app
 AGENT_URL=https://your-agent.railway.app
 ```
@@ -241,21 +243,50 @@ git clone https://github.com/NikitaDmitrieff/feedback-chat
 cd feedback-chat/packages/agent
 ```
 
+#### Claude authentication for the agent
+
+The agent needs Claude Code CLI to implement changes. Two options:
+
+**Option A: Claude Max subscription (recommended, $0/run)**
+
+Extract your OAuth credentials from the Claude Code CLI keychain entry and set `CLAUDE_CREDENTIALS_JSON`. The agent uses `CLAUDE_CODE_OAUTH_TOKEN` internally to authenticate the CLI in headless Docker — this requires the Dockerfile to include `{"hasCompletedOnboarding": true}` in `~/.claude.json` (already configured).
+
+**Option B: API key (pay per token)**
+
+Set `ANTHROPIC_API_KEY` on the agent service. Simpler but costs per token.
+
 #### Railway deployment
 
+**IMPORTANT: When setting env vars on Railway, generate a single script the user can run themselves. Source values from `.env.local` — never read or echo secrets through individual tool calls.**
+
+The Railway CLI workflow has specific ordering requirements:
+
 ```bash
+# 1. Install CLI and login
 npm install -g @railway/cli
 railway login
+
+# 2. Create project (from the packages/agent directory)
 railway init
+
+# 3. First deploy — creates the service
+railway up --detach
+
+# 4. Find and link the service (needed for variable management)
+railway service status --all    # note the service name
+railway service link <name>     # link it
+
+# 5. Set env vars (Railway auto-redeploys on changes)
 railway variables set GITHUB_TOKEN=ghp_...
 railway variables set GITHUB_REPO=owner/repo
 railway variables set WEBHOOK_SECRET=$(openssl rand -hex 32)
-# Choose one:
-railway variables set CLAUDE_CREDENTIALS_JSON='...'  # Max ($0/run)
+# Choose one auth method:
+railway variables set CLAUDE_CREDENTIALS_JSON='{"claudeAiOauth":{...}}'
 # or:
-railway variables set ANTHROPIC_API_KEY=sk-ant-...    # API key (pay per token)
-railway up
-railway domain  # Save this URL for AGENT_URL and webhook
+railway variables set ANTHROPIC_API_KEY=sk-ant-...
+
+# 6. Get public domain
+railway domain    # Save this URL for AGENT_URL and webhook
 ```
 
 #### Docker deployment
@@ -275,13 +306,14 @@ docker run -p 3000:3000 --env-file .env feedback-agent
 5. **Events:** Select "Let me select individual events" → check **Issues** only
 6. Click **Add webhook**
 
-Or automate:
+Or automate (**note the `config[content_type]=json` — without it, GitHub sends `form-urlencoded` and the agent returns 415**):
 
 ```bash
 gh api repos/OWNER/REPO/hooks \
-  -f url="https://your-agent.railway.app/webhook/github" \
-  -f content_type=json \
-  -f secret="WEBHOOK_SECRET_VALUE" \
+  -f name=web -f active=true \
+  -f "config[url]=https://your-agent.railway.app/webhook/github" \
+  -f "config[content_type]=json" \
+  -f "config[secret]=WEBHOOK_SECRET_VALUE" \
   -f 'events[]=issues'
 ```
 
@@ -354,3 +386,12 @@ Add this section to the consumer project's CLAUDE.md:
 - The widget renders as a fixed-position side panel (right edge) + bottom-center trigger bar
 - For + Pipeline: `agentUrl` must be passed to `createStatusHandler` or the tracker can't check agent status
 - GitHub labels must be created on the consumer's repo before the pipeline can function
+- `GITHUB_TOKEN` must be a PAT (`ghp_` prefix). OAuth tokens (`gho_`) expire after ~8 hours and will silently break issue creation
+- The agent Dockerfile uses a multi-stage build — `dist/` is NOT expected pre-built, it compiles in the builder stage
+- The agent runs as a non-root `agent` user — Claude Code CLI refuses `--dangerously-skip-permissions` as root
+- The agent uses `CLAUDE_CODE_OAUTH_TOKEN` env var (not credentials file) to authenticate the CLI in headless Docker. This requires `~/.claude.json` with `{"hasCompletedOnboarding": true}` (see [anthropics/claude-code#8938](https://github.com/anthropics/claude-code/issues/8938))
+- When creating GitHub webhooks via `gh api`, you MUST use `config[content_type]=json` — the default is `form-urlencoded` which the Fastify agent rejects with 415
+
+## Credential Security
+
+When helping users set up the agent, **never read or echo secrets through individual tool calls**. Instead, generate a single bash script the user can run themselves that sources values from `.env.local` and system keychains. This avoids dozens of permission prompts for each secret.

@@ -72,8 +72,50 @@ The agent attempts auto-fix (up to 2 rounds). If it still fails:
 ## Agent uses API key instead of Max subscription
 
 - Set `CLAUDE_CREDENTIALS_JSON` env var on the agent
-- The agent automatically strips `ANTHROPIC_API_KEY` from the CLI environment when OAuth credentials exist
-- Check agent logs for "OAuth token refreshed" messages
+- The agent reads the OAuth access token and passes it as `CLAUDE_CODE_OAUTH_TOKEN` to the CLI
+- `ANTHROPIC_API_KEY` is stripped from the CLI environment when OAuth credentials exist
+- Check agent logs for `[oauth] Token valid` or `[oauth] Token refreshed` messages
+
+## Agent fails: "git: not found"
+
+The Dockerfile must install git in the runtime stage. The shipped Dockerfile already does this — if you're using a custom Dockerfile, add:
+```dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates && rm -rf /var/lib/apt/lists/*
+```
+
+## Agent fails: "--dangerously-skip-permissions cannot be used with root"
+
+The Docker container must run as a non-root user. The shipped Dockerfile creates an `agent` user. If using a custom Dockerfile:
+```dockerfile
+RUN useradd -m -s /bin/bash agent
+RUN chown -R agent:agent /app /tmp
+USER agent
+```
+
+## Agent fails: "Not logged in" or "Invalid API key" with Max OAuth
+
+The agent uses `CLAUDE_CODE_OAUTH_TOKEN` (not the credentials file) to authenticate in headless Docker. Ensure:
+1. `CLAUDE_CREDENTIALS_JSON` is set on the agent service
+2. The Dockerfile includes: `RUN echo '{"hasCompletedOnboarding":true}' > /home/agent/.claude.json`
+3. Check agent logs for `[oauth] Token valid` or `[oauth] Token refreshed` messages
+
+See [anthropics/claude-code#8938](https://github.com/anthropics/claude-code/issues/8938) for the onboarding workaround.
+
+## Webhook returns 415 (Unsupported Media Type)
+
+The webhook was created with `application/x-www-form-urlencoded` content type instead of `application/json`. Fix it:
+```bash
+gh api repos/OWNER/REPO/hooks/HOOK_ID --method PATCH \
+  -f "config[content_type]=json" \
+  -f "config[url]=https://your-agent.railway.app/webhook/github" \
+  -f "config[secret]=YOUR_WEBHOOK_SECRET"
+```
+
+When creating webhooks via `gh api`, always use `config[content_type]=json`.
+
+## GitHub issues silently not created
+
+Check if `GITHUB_TOKEN` starts with `gho_` — these are short-lived GitHub OAuth tokens that expire after ~8 hours. Replace with a PAT (`ghp_` prefix) from [github.com/settings/tokens/new](https://github.com/settings/tokens/new) with `repo` + `workflow` scopes.
 
 ## "Request changes" doesn't trigger a retry
 

@@ -1,5 +1,7 @@
 import { execSync, execFileSync } from 'node:child_process'
-import { existsSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { parseIssueBody } from './parse-issue.js'
 import {
   commentOnIssue,
@@ -45,35 +47,49 @@ function run(cmd: string, cwd: string, timeoutMs = STEP_TIMEOUT_MS): string {
   }
 }
 
-// Build env for Claude CLI: strip ANTHROPIC_API_KEY when OAuth credentials exist
-// so the CLI falls back to the Max subscription OAuth token
-function claudeEnv(): NodeJS.ProcessEnv {
-  if (!process.env.CLAUDE_CREDENTIALS_JSON) return process.env
-  const { ANTHROPIC_API_KEY: _, ...rest } = process.env
-  return rest
-}
-
-async function runClaude(prompt: string, workDir: string, issueNumber: number, timeoutMs: number): Promise<void> {
-  // Refresh OAuth token if needed before invoking the CLI
+// Build env for Claude CLI: refresh OAuth token and pass it via
+// CLAUDE_CODE_OAUTH_TOKEN so the CLI uses the Max subscription.
+// Also strip ANTHROPIC_API_KEY to ensure it doesn't fall back to API billing.
+async function claudeEnv(): Promise<NodeJS.ProcessEnv> {
   if (process.env.CLAUDE_CREDENTIALS_JSON) {
     const ok = await ensureValidToken()
     if (!ok) {
-      throw new Error('OAuth token refresh failed — cannot run Claude CLI')
+      console.warn('[claude] OAuth refresh failed, falling back to process.env')
+      return { ...process.env, CI: 'true' }
     }
+    try {
+      const credsPath = join(homedir(), '.claude', '.credentials.json')
+      const creds = JSON.parse(readFileSync(credsPath, 'utf-8'))
+      const accessToken = creds?.claudeAiOauth?.accessToken
+      if (accessToken) {
+        const { ANTHROPIC_API_KEY: _, ...rest } = process.env
+        return { ...rest, CLAUDE_CODE_OAUTH_TOKEN: accessToken, CI: 'true' }
+      }
+    } catch {}
   }
+  return { ...process.env, CI: 'true' }
+}
 
+async function runClaude(prompt: string, workDir: string, issueNumber: number, timeoutMs: number): Promise<void> {
+  const env = await claudeEnv()
   console.log(`[job-${issueNumber}] Running Claude Code CLI...`)
-  execFileSync(
-    'claude',
-    ['--dangerously-skip-permissions', '-p', prompt],
-    {
-      cwd: workDir,
-      timeout: timeoutMs,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: claudeEnv(),
-    }
-  )
+  try {
+    execFileSync(
+      'claude',
+      ['--dangerously-skip-permissions', '-p', prompt],
+      {
+        cwd: workDir,
+        timeout: timeoutMs,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env,
+      }
+    )
+  } catch (err: unknown) {
+    const e = err as { stderr?: string; stdout?: string; status?: number }
+    const details = `Exit code: ${e.status}\nSTDERR: ${(e.stderr || '').slice(-2000)}\nSTDOUT: ${(e.stdout || '').slice(-2000)}`
+    throw new Error(`Command failed: claude --dangerously-skip-permissions -p ...\n${details}`)
+  }
 }
 
 function getChangedFiles(workDir: string): string[] {

@@ -28,6 +28,11 @@
     "Three package exports: '@nikitadmitrieff/feedback-chat' (client components), '@nikitadmitrieff/feedback-chat/server' (createFeedbackHandler, createStatusHandler), '@nikitadmitrieff/feedback-chat/styles.css' (styles).",
     "The widget CSS is scoped under .feedback-panel — do not override it with consumer styles.",
     "For pipeline tier: consumer needs AGENT_URL env var pointing to the deployed agent service. Agent needs GITHUB_TOKEN, GITHUB_REPO, WEBHOOK_SECRET, and either CLAUDE_CREDENTIALS_JSON (Max, $0/run) or ANTHROPIC_API_KEY.",
+    "The agent Dockerfile uses a multi-stage build — dist/ is compiled in the builder stage, not pre-built. The runtime stage installs git/curl, creates a non-root 'agent' user (Claude Code CLI refuses --dangerously-skip-permissions as root), and writes {hasCompletedOnboarding:true} to ~/.claude.json.",
+    "The agent authenticates Claude Code CLI via CLAUDE_CODE_OAUTH_TOKEN env var (not credentials file). This is the only way to use Max OAuth in headless Docker. The agent reads the refreshed access token from ~/.claude/.credentials.json and passes it as CLAUDE_CODE_OAUTH_TOKEN. Requires hasCompletedOnboarding workaround (GitHub issue anthropics/claude-code#8938).",
+    "GITHUB_TOKEN must be a Personal Access Token (ghp_ prefix). OAuth tokens (gho_) expire after ~8 hours and will silently break issue creation.",
+    "When creating GitHub webhooks via gh api, you MUST use config[content_type]=json. The default is form-urlencoded which the Fastify agent rejects with 415.",
+    "Railway CLI workflow: railway init → railway up --detach (creates service) → railway service status --all (find name) → railway service link <name> → railway variables set ... → railway domain. You must link the service before setting variables.",
     "GitHub conventions are fixed: branch naming is feedback/issue-{N}, labels are feedback-bot/auto-implement/in-progress/agent-failed/preview-pending/rejected. Do not change these.",
     "localStorage keys are fixed: feedback_conversations, feedback_conv_{id}, feedback_active_conv. sessionStorage: feedback_password."
   ]

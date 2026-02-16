@@ -235,9 +235,11 @@ gh label create rejected --color E4E669 --description "User rejected changes"
 ### Additional environment variables
 
 ```env
-GITHUB_TOKEN=ghp_...              # Needs 'repo' scope
+GITHUB_TOKEN=ghp_...              # MUST be a PAT (ghp_ prefix) — 'repo' + 'workflow' scopes
 GITHUB_REPO=owner/repo            # e.g. nikitadmitrieff/my-app
 ```
+
+> **Warning:** `GITHUB_TOKEN` must start with `ghp_` (Personal Access Token). Tokens starting with `gho_` are short-lived GitHub OAuth tokens that expire after ~8 hours and will silently break issue creation. Generate a PAT at [github.com/settings/tokens/new](https://github.com/settings/tokens/new).
 
 ### Verify
 
@@ -288,33 +290,52 @@ npm install -g @railway/cli
 railway login
 ```
 
-3. Create a Railway project:
+3. Create a Railway project and do the first deploy:
 
 ```bash
 railway init
+railway up --detach    # creates the service
 ```
 
-4. Set environment variables:
+4. Link the service (required before you can set variables):
+
+```bash
+railway service status --all    # note the service name
+railway service link <name>     # link it
+```
+
+5. Set environment variables:
 
 ```bash
 railway variables set GITHUB_TOKEN=ghp_...
 railway variables set GITHUB_REPO=owner/repo
 railway variables set WEBHOOK_SECRET=$(openssl rand -hex 32)
+```
 
-# Claude authentication — choose one:
-# Option A: Max subscription (recommended, $0/run)
+6. Set Claude authentication (choose one):
+
+**Option A: Max subscription (recommended, $0/run)**
+
+The agent uses `CLAUDE_CODE_OAUTH_TOKEN` internally to authenticate the CLI in headless Docker. To set it up:
+
+```bash
 railway variables set CLAUDE_CREDENTIALS_JSON='{"claudeAiOauth":{"accessToken":"...","refreshToken":"...","expiresAt":...}}'
-# Option B: API key fallback (pay per token)
+```
+
+The credentials JSON comes from your Claude Code CLI keychain entry. On macOS:
+```bash
+security find-generic-password -s "Claude Code-credentials" -a "YOUR_USERNAME" -w
+```
+
+The agent refreshes the OAuth token automatically before each job. The Dockerfile includes `{"hasCompletedOnboarding": true}` in `~/.claude.json` — this is required for `CLAUDE_CODE_OAUTH_TOKEN` to work (see [anthropics/claude-code#8938](https://github.com/anthropics/claude-code/issues/8938)).
+
+**Option B: API key (pay per token)**
+
+```bash
 railway variables set ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-5. Deploy:
-
-```bash
-railway up
-```
-
-6. Get your agent URL:
+7. Get your agent URL:
 
 ```bash
 railway domain
@@ -322,13 +343,22 @@ railway domain
 
 Save this URL — you need it for the webhook and `AGENT_URL` env var.
 
+> **Note:** Railway auto-redeploys when env vars change. After step 5-6, wait for the deploy to succeed before testing.
+
 #### Docker
+
+The Dockerfile uses a **multi-stage build** — you do NOT need to pre-build `dist/`. It compiles TypeScript in the builder stage, then copies the result to the runtime stage.
 
 ```bash
 cd packages/agent
 docker build -t feedback-agent .
 docker run -p 3000:3000 --env-file .env feedback-agent
 ```
+
+Key things the Dockerfile handles:
+- Installs `git`, `curl`, `ca-certificates` (the agent needs git to clone consumer repos)
+- Creates a non-root `agent` user (Claude Code CLI refuses `--dangerously-skip-permissions` as root)
+- Writes `{"hasCompletedOnboarding": true}` to `~/.claude.json` (required for OAuth)
 
 ### Configure GitHub webhook
 
@@ -339,13 +369,14 @@ docker run -p 3000:3000 --env-file .env feedback-agent
 5. **Events:** Select "Let me select individual events" → check **Issues** only
 6. Click **Add webhook**
 
-Or automate it:
+Or automate it (**`config[content_type]=json` is required** — the default is `form-urlencoded` which the agent rejects with 415):
 
 ```bash
 gh api repos/OWNER/REPO/hooks \
-  -f url="https://your-agent.railway.app/webhook/github" \
-  -f content_type=json \
-  -f secret="YOUR_WEBHOOK_SECRET" \
+  -f name=web -f active=true \
+  -f "config[url]=https://your-agent.railway.app/webhook/github" \
+  -f "config[content_type]=json" \
+  -f "config[secret]=YOUR_WEBHOOK_SECRET" \
   -f 'events[]=issues'
 ```
 
@@ -363,10 +394,10 @@ Set these on your **agent service** (Railway/Docker):
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `GITHUB_TOKEN` | Yes | — | GitHub token (`repo` + `workflow` scopes) |
+| `GITHUB_TOKEN` | Yes | — | GitHub PAT (`ghp_` prefix) with `repo` + `workflow` scopes |
 | `GITHUB_REPO` | Yes | — | Target repository (`owner/name`) |
 | `WEBHOOK_SECRET` | Yes | — | Random string for webhook HMAC verification |
-| `CLAUDE_CREDENTIALS_JSON` | One of | — | Max subscription OAuth credentials ($0/run) |
+| `CLAUDE_CREDENTIALS_JSON` | One of | — | Max subscription OAuth credentials ($0/run) — agent passes token via `CLAUDE_CODE_OAUTH_TOKEN` |
 | `ANTHROPIC_API_KEY` | One of | — | API key fallback (pay per token) |
 | `AGENT_INSTALL_CMD` | No | `npm ci` | Install command |
 | `AGENT_BUILD_CMD` | No | `npm run build` | Build command |
@@ -504,6 +535,45 @@ Ensure both `GITHUB_TOKEN` and `GITHUB_REPO` are set in `.env.local` and passed 
 
 - The agent is building and linting — check agent logs
 - After 25 minutes the job budget expires — check for `agent-failed` label
+
+### Agent fails: "git: not found"
+
+The Dockerfile must install git in the runtime stage. If you're using a custom Dockerfile, add:
+```dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates && rm -rf /var/lib/apt/lists/*
+```
+
+### Agent fails: "--dangerously-skip-permissions cannot be used with root"
+
+The Docker container must run as a non-root user. Add to your Dockerfile:
+```dockerfile
+RUN useradd -m -s /bin/bash agent
+RUN chown -R agent:agent /app /tmp
+USER agent
+```
+
+### Agent fails: "Not logged in" or "Invalid API key" with Max OAuth
+
+The agent uses `CLAUDE_CODE_OAUTH_TOKEN` (not the credentials file) to authenticate in headless Docker. Ensure:
+1. `CLAUDE_CREDENTIALS_JSON` is set on the agent service
+2. The Dockerfile includes: `RUN echo '{"hasCompletedOnboarding":true}' > /home/agent/.claude.json`
+3. Check agent logs for `[oauth] Token valid` or `[oauth] Token refreshed` messages
+
+See [anthropics/claude-code#8938](https://github.com/anthropics/claude-code/issues/8938) for the onboarding workaround.
+
+### Webhook returns 415 (Unsupported Media Type)
+
+The webhook was created with `application/x-www-form-urlencoded` content type instead of `application/json`. Fix it:
+```bash
+gh api repos/OWNER/REPO/hooks/HOOK_ID --method PATCH \
+  -f "config[content_type]=json" \
+  -f "config[url]=https://your-agent.railway.app/webhook/github" \
+  -f "config[secret]=YOUR_WEBHOOK_SECRET"
+```
+
+### GitHub issues silently not created (no errors)
+
+Check if `GITHUB_TOKEN` starts with `gho_` — these are short-lived OAuth tokens that expire after ~8 hours. Replace with a PAT (`ghp_` prefix) from [github.com/settings/tokens/new](https://github.com/settings/tokens/new).
 
 ## Conventions (fixed)
 

@@ -20,16 +20,79 @@ GitHub webhook (issue opened/reopened)
       8. Mark as preview-pending
 ```
 
+## Dockerfile
+
+The agent ships with a **multi-stage Dockerfile** that handles everything:
+
+```
+Builder stage (node:22-slim):
+  - npm install (dev deps for compilation)
+  - tsc (compile TypeScript)
+
+Runtime stage (node:22-slim):
+  - apt-get install git, curl, ca-certificates
+  - npm install -g @anthropic-ai/claude-code
+  - useradd agent (non-root user)
+  - npm install --production
+  - COPY --from=builder dist/
+  - chown -R agent:agent /app /tmp
+  - USER agent
+  - git config (for commits)
+  - {"hasCompletedOnboarding": true} → ~/.claude.json
+```
+
+Key points:
+- **No pre-built `dist/` required** — the builder stage compiles TypeScript
+- **`git` must be installed** — the agent clones consumer repos at runtime
+- **Non-root user is mandatory** — Claude Code CLI refuses `--dangerously-skip-permissions` as root
+- **`hasCompletedOnboarding`** — required for `CLAUDE_CODE_OAUTH_TOKEN` to work in headless environments (see [anthropics/claude-code#8938](https://github.com/anthropics/claude-code/issues/8938))
+- **`tsconfig.base.json`** — lives in `packages/agent/` alongside `tsconfig.json` (the Dockerfile copies both)
+
 ## Railway (recommended)
 
-1. Fork the feedback-chat repo
-2. Create a new Railway project from the `packages/agent/` directory
-3. Set all environment variables (see below)
-4. Create a GitHub webhook:
-   - **URL:** `https://your-app.railway.app/webhook/github`
-   - **Content type:** `application/json`
-   - **Secret:** same as `WEBHOOK_SECRET`
-   - **Events:** Issues only
+### Step-by-step
+
+```bash
+# 1. Clone and navigate to the agent
+git clone https://github.com/NikitaDmitrieff/feedback-chat
+cd feedback-chat/packages/agent
+
+# 2. Install Railway CLI and login
+npm install -g @railway/cli
+railway login
+
+# 3. Create project and do first deploy (creates the service)
+railway init
+railway up --detach
+
+# 4. Link the service (required for variable management)
+railway service status --all    # note the auto-generated service name
+railway service link <name>     # e.g. railway service link amusing-communication
+
+# 5. Set required env vars
+railway variables set GITHUB_TOKEN=ghp_...
+railway variables set GITHUB_REPO=owner/repo
+railway variables set WEBHOOK_SECRET=$(openssl rand -hex 32)
+
+# 6. Set Claude auth (choose one)
+# Option A: Max subscription ($0/run)
+railway variables set CLAUDE_CREDENTIALS_JSON='{"claudeAiOauth":{...}}'
+# Option B: API key (pay per token)
+railway variables set ANTHROPIC_API_KEY=sk-ant-...
+
+# 7. Get public domain
+railway domain    # save this URL
+
+# 8. Verify
+curl https://your-domain.railway.app/health
+```
+
+### Railway CLI gotchas
+
+- `railway init` creates a project but doesn't create a service — the first `railway up` does
+- You must `railway service link <name>` before `railway variables set` will work
+- `railway service status --all` shows all services and their deploy status
+- Railway auto-redeploys when env vars change — wait for SUCCESS before testing
 
 ## Docker
 
@@ -39,13 +102,15 @@ docker build -t feedback-agent .
 docker run -p 3000:3000 --env-file .env feedback-agent
 ```
 
+Create `.env` with the required variables (see below).
+
 ## Environment variables
 
 ### Required
 
 | Variable | Description |
 |----------|-------------|
-| `GITHUB_TOKEN` | GitHub token with `repo` + `workflow` scopes |
+| `GITHUB_TOKEN` | GitHub PAT (`ghp_` prefix) with `repo` + `workflow` scopes. **Not** `gho_` tokens (they expire after ~8h) |
 | `GITHUB_REPO` | Target repository (`owner/name`) |
 | `WEBHOOK_SECRET` | Random string for webhook HMAC verification |
 
@@ -56,7 +121,24 @@ docker run -p 3000:3000 --env-file .env feedback-agent
 | `CLAUDE_CREDENTIALS_JSON` | Claude Max OAuth credentials (JSON string) — **$0/run** |
 | `ANTHROPIC_API_KEY` | API key fallback — pay per token |
 
-Using Claude Max is recommended. The agent strips `ANTHROPIC_API_KEY` from the CLI environment when OAuth credentials exist, so the CLI uses your Max subscription.
+#### How Max OAuth works in the agent
+
+The flow is:
+
+1. At startup, `initCredentials()` writes `CLAUDE_CREDENTIALS_JSON` to `~/.claude/.credentials.json`
+2. Before each job, `ensureValidToken()` checks if the token expires within 5 minutes
+3. If expiring, it refreshes using the `refresh_token` grant against Anthropic's OAuth endpoint
+4. `claudeEnv()` reads the refreshed access token and passes it as `CLAUDE_CODE_OAUTH_TOKEN` to the CLI
+5. `ANTHROPIC_API_KEY` is stripped from the env so the CLI can't fall back to API billing
+
+The `CLAUDE_CODE_OAUTH_TOKEN` env var is the only way to authenticate Claude Code CLI in headless Docker — the credentials file approach doesn't work because Docker containers lack system keychains (macOS Keychain, Linux libsecret).
+
+**To get your credentials JSON** (on macOS with Claude Code installed):
+```bash
+security find-generic-password -s "Claude Code-credentials" -a "YOUR_USERNAME" -w
+```
+
+Extract the `claudeAiOauth` portion (accessToken, refreshToken, expiresAt).
 
 ### Optional
 
@@ -77,6 +159,27 @@ Using Claude Max is recommended. The agent strips `ANTHROPIC_API_KEY` from the C
 ```env
 # Forward all NEXT_PUBLIC_ vars + a specific one
 AGENT_ENV_FORWARD=NEXT_PUBLIC_*,DATABASE_URL
+```
+
+## GitHub webhook setup
+
+Create a webhook on your consumer repo (not the feedback-chat repo):
+
+1. Go to repo → **Settings** → **Webhooks** → **Add webhook**
+2. **Payload URL:** `https://your-agent.railway.app/webhook/github`
+3. **Content type:** `application/json` (**critical** — `form-urlencoded` causes 415 errors)
+4. **Secret:** same value as `WEBHOOK_SECRET`
+5. **Events:** Select "Let me select individual events" → check **Issues** only
+
+Or via CLI (**note `config[content_type]=json`** — without it GitHub defaults to form-urlencoded):
+
+```bash
+gh api repos/OWNER/REPO/hooks \
+  -f name=web -f active=true \
+  -f "config[url]=https://your-agent.railway.app/webhook/github" \
+  -f "config[content_type]=json" \
+  -f "config[secret]=YOUR_WEBHOOK_SECRET" \
+  -f 'events[]=issues'
 ```
 
 ## Health endpoint
@@ -113,7 +216,7 @@ Checks the 5 most recent issue comments for `**Modifications demandées :**` (po
 
 ### 5. Claude Code CLI
 
-Runs `claude --dangerously-skip-permissions -p '{prompt}'`. Uses Max OAuth if available, API key fallback otherwise.
+Runs `claude --dangerously-skip-permissions -p '{prompt}'`. Uses `CLAUDE_CODE_OAUTH_TOKEN` if Max credentials are available, `ANTHROPIC_API_KEY` as fallback. The `CI=true` env var is always set to prevent interactive prompts.
 
 ### 6. Validation loop
 
@@ -144,6 +247,7 @@ The agent automatically refreshes Claude Max OAuth tokens before each job:
 - Checks if token expires within 5 minutes
 - If expiring: calls Anthropic OAuth endpoint with refresh token
 - Updates credentials file
+- Passes refreshed token as `CLAUDE_CODE_OAUTH_TOKEN` to the CLI env
 
 Initial credentials come from `CLAUDE_CREDENTIALS_JSON` env var (JSON string from the Max OAuth flow).
 

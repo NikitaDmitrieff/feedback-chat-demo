@@ -95,12 +95,23 @@ At the `failed` stage:
 
 - **Retry** — removes `agent-failed` and `in-progress` labels, reopens the issue for the agent to try again
 
+## How Max OAuth works in the agent
+
+When you set `CLAUDE_CREDENTIALS_JSON`, the agent:
+
+1. Writes credentials to `~/.claude/.credentials.json` at startup
+2. Refreshes the OAuth token before each job (if expiring within 5 min)
+3. Reads the refreshed access token and passes it as `CLAUDE_CODE_OAUTH_TOKEN` to the CLI
+4. Strips `ANTHROPIC_API_KEY` from the env so the CLI can't fall back to API billing
+
+This is the only way to use Max OAuth in headless Docker — the credentials file approach doesn't work because containers lack system keychains. The Dockerfile also writes `{"hasCompletedOnboarding": true}` to `~/.claude.json` (required workaround for [anthropics/claude-code#8938](https://github.com/anthropics/claude-code/issues/8938)).
+
 ## Cost
 
 | Component | Cost | Auth method |
 |-----------|------|-------------|
 | Chat (Haiku) | ~$0.01/conversation | `ANTHROPIC_API_KEY` |
-| Code agent | $0/implementation | Claude Max OAuth |
+| Code agent | $0/implementation | Claude Max OAuth via `CLAUDE_CODE_OAUTH_TOKEN` |
 | Railway | ~$5/month (sleeps when idle) | Railway token |
 | Vercel previews | Free (hobby) or included in Pro | Existing Vercel setup |
 
