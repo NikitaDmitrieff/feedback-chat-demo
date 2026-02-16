@@ -15,6 +15,8 @@ import { ensureValidToken, initCredentials } from './oauth.js'
 import { loadConfig, matchesEnvPattern } from './config.js'
 import type { GitHubConfig } from './github.js'
 import type { SupabaseClient } from '@supabase/supabase-js'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySupabaseClient = SupabaseClient<any, any, any>
 import { DbLogger } from './logger.js'
 
 const STEP_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes per build/test step
@@ -363,7 +365,7 @@ export interface ManagedJobInput extends JobInput {
   claudeCredentials?: string
   anthropicApiKey?: string
   runId: string
-  supabase: SupabaseClient
+  supabase: AnySupabaseClient
 }
 
 export async function runManagedJob(input: ManagedJobInput): Promise<void> {

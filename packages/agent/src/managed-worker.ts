@@ -1,11 +1,11 @@
 import { createSupabaseClient } from './supabase.js'
 import { runManagedJob } from './worker.js'
-import type { SupabaseClient } from '@supabase/supabase-js'
+type Supabase = ReturnType<typeof createSupabaseClient>
 
 const POLL_INTERVAL_MS = 5_000
 const WORKER_ID = `worker-${process.pid}-${Date.now()}`
 
-async function pollForJobs(supabase: SupabaseClient) {
+async function pollForJobs(supabase: Supabase) {
   const { data: job, error } = await supabase.rpc('claim_next_job', {
     p_worker_id: WORKER_ID,
   })
@@ -14,7 +14,7 @@ async function pollForJobs(supabase: SupabaseClient) {
   return job
 }
 
-async function fetchCredentials(supabase: SupabaseClient, projectId: string) {
+async function fetchCredentials(supabase: Supabase, projectId: string) {
   const { data } = await supabase
     .from('credentials')
     .select('type, encrypted_value')
@@ -29,7 +29,7 @@ async function fetchCredentials(supabase: SupabaseClient, projectId: string) {
   }
 }
 
-async function fetchGithubConfig(supabase: SupabaseClient, projectId: string) {
+async function fetchGithubConfig(supabase: Supabase, projectId: string) {
   const { data: project } = await supabase
     .from('projects')
     .select('github_repo')
@@ -44,7 +44,7 @@ async function fetchGithubConfig(supabase: SupabaseClient, projectId: string) {
   return { token, repo: project.github_repo }
 }
 
-async function findRunId(supabase: SupabaseClient, projectId: string, issueNumber: number): Promise<string> {
+async function findRunId(supabase: Supabase, projectId: string, issueNumber: number): Promise<string> {
   const { data } = await supabase
     .from('pipeline_runs')
     .select('id')
@@ -58,7 +58,7 @@ async function findRunId(supabase: SupabaseClient, projectId: string, issueNumbe
   return data.id
 }
 
-async function processJob(supabase: SupabaseClient, job: {
+async function processJob(supabase: Supabase, job: {
   id: string
   project_id: string
   github_issue_number: number
