@@ -1,10 +1,11 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Github, Loader2, MessageSquareText, Eye, EyeOff } from 'lucide-react'
 
-export default function LoginPage() {
+function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -175,3 +176,5 @@ export default function LoginPage() {
     </div>
   )
 }
+
+export default dynamic(() => Promise.resolve(LoginPage), { ssr: false })
