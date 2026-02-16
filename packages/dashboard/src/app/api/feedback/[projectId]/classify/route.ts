@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { anthropic } from '@ai-sdk/anthropic'
 import { generateObject } from 'ai'
 import { z } from 'zod'
+import type { FeedbackMessage, FeedbackTheme } from '@/lib/types'
 
 const THEME_COLORS = [
   '#5e9eff',
@@ -54,20 +55,20 @@ export async function POST(
     return NextResponse.json({ error: themesError.message }, { status: 500 })
   }
 
-  const existingThemes = rawThemes ?? []
+  const typedMessages = (messages ?? []) as FeedbackMessage[]
+  const existingThemes = (rawThemes ?? []) as FeedbackTheme[]
 
-  const conversationText = messages
-    .map((m: { role: string; content: string }) => `${m.role}: ${m.content}`)
+  const conversationText = typedMessages
+    .map((m) => `${m.role}: ${m.content}`)
     .join('\n')
 
-  const existingThemeNames = existingThemes.map((t: { name: string }) => t.name)
+  const existingThemeNames = existingThemes.map((t) => t.name)
 
   const { object: classification } = await generateObject({
     model: anthropic('claude-haiku-4-5-20251001'),
     schema: z.object({
       summary: z.string(),
       themes: z.array(z.string()).min(1).max(3),
-      app_area: z.string(),
     }),
     prompt: `Analyze this feedback conversation and classify it.
 
@@ -78,15 +79,14 @@ ${conversationText}
 
 Return:
 - summary: A concise 1-2 sentence summary of the feedback
-- themes: 1-3 theme labels (short, lowercase, e.g. "ui bug", "performance", "feature request"). Reuse existing theme names when they fit.
-- app_area: The area of the app this feedback relates to (e.g. "navigation", "settings", "onboarding")`,
+- themes: 1-3 theme labels (short, lowercase, e.g. "ui bug", "performance", "feature request"). Reuse existing theme names when they fit.`,
   })
 
   const themeIds: string[] = []
 
   for (const themeName of classification.themes) {
     const existing = existingThemes.find(
-      (t: { name: string }) => t.name.toLowerCase() === themeName.toLowerCase()
+      (t) => t.name.toLowerCase() === themeName.toLowerCase()
     )
 
     if (existing) {
@@ -100,7 +100,7 @@ Return:
 
       themeIds.push(existing.id)
     } else {
-      const usedColors = existingThemes.map((t: { color: string }) => t.color)
+      const usedColors = existingThemes.map((t) => t.color)
       const availableColor =
         THEME_COLORS.find((c) => !usedColors.includes(c)) || THEME_COLORS[themeIds.length % THEME_COLORS.length]
 

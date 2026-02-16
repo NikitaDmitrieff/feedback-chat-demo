@@ -9,10 +9,10 @@ export function TesterActivity({
   onSelectTester,
 }: {
   testers: TesterSummary[]
-  onSelectTester: (testerId: string) => void
+  onSelectTester: () => void
 }) {
   const resolutionRate = (t: TesterSummary) =>
-    t.total_count > 0 ? Math.round((t.resolved_count / t.total_count) * 100) : 0
+    t.session_count > 0 ? Math.round((t.resolved_count / t.session_count) * 100) : 0
 
   if (testers.length === 0) {
     return (
@@ -35,7 +35,7 @@ export function TesterActivity({
           return (
             <button
               key={tester.tester_id}
-              onClick={() => onSelectTester(tester.tester_id)}
+              onClick={onSelectTester}
               className="glass-card w-full p-4 text-left transition-colors hover:border-white/[0.08]"
             >
               <div className="flex items-start justify-between gap-3">
@@ -52,7 +52,7 @@ export function TesterActivity({
                       <>
                         <span className="text-white/10">&middot;</span>
                         <div className="flex gap-1">
-                          {tester.top_themes.slice(0, 3).map((theme) => (
+                          {tester.top_themes.map((theme) => (
                             <span
                               key={theme.name}
                               className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"

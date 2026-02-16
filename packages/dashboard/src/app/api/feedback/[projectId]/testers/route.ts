@@ -76,7 +76,6 @@ export async function GET(
       last_active: lastActive,
       top_themes: topThemes,
       resolved_count: resolvedCount,
-      total_count: testerSessions.length,
     })
   }
 
