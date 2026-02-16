@@ -53,6 +53,14 @@ When asked to install this widget in a Next.js app, follow these steps exactly.
 
 If the user doesn't specify, default to **Chat only** and mention the other tiers are available.
 
+### Before You Start
+
+> **Common blockers that waste 30+ minutes if missed:**
+>
+> 1. **Tailwind v4 `@source` is mandatory** — the widget renders completely unstyled without it (Step 3)
+> 2. **React 19.1.0 and 19.1.1 are excluded** by `@ai-sdk/react` — build will fail (Step 1)
+> 3. **`FeedbackPanel` only accepts `isOpen` and `onToggle`** — no `statusUrl`, no `apiUrl` prop needed (it defaults to `/api/feedback/chat`)
+
 ### Step 1: Check React version
 
 **This is a build breaker.** `@ai-sdk/react` explicitly excludes `react@19.1.0` and `19.1.1`.
@@ -91,6 +99,7 @@ import { createFeedbackHandler } from '@nikitadmitrieff/feedback-chat/server'
 
 const handler = createFeedbackHandler({
   password: process.env.FEEDBACK_PASSWORD!,
+  // projectContext: 'Brief description of your app for the AI advisor',
 })
 
 export const POST = handler.POST
@@ -103,6 +112,7 @@ import { createFeedbackHandler } from '@nikitadmitrieff/feedback-chat/server'
 
 const handler = createFeedbackHandler({
   password: process.env.FEEDBACK_PASSWORD!,
+  // projectContext: 'Brief description of your app for the AI advisor',
   github: {
     token: process.env.GITHUB_TOKEN!,
     repo: process.env.GITHUB_REPO!,
@@ -211,6 +221,8 @@ GITHUB_REPO=owner/repo            # e.g. nikitadmitrieff/my-app
 
 **IMPORTANT: `GITHUB_TOKEN` must start with `ghp_` (Personal Access Token).** Tokens starting with `gho_` are short-lived GitHub OAuth tokens that expire after ~8 hours. Generate a PAT at https://github.com/settings/tokens/new with `repo` + `workflow` scopes.
 
+> **WARNING:** `gh auth token` returns a short-lived `gho_` OAuth token that expires in ~8h. Do NOT use it as `GITHUB_TOKEN`. Generate a PAT (`ghp_` prefix) at github.com/settings/tokens/new with `repo` + `workflow` scopes.
+
 **+ Pipeline:**
 
 ```env
@@ -249,7 +261,14 @@ The agent needs Claude Code CLI to implement changes. Two options:
 
 **Option A: Claude Max subscription (recommended, $0/run)**
 
-Extract your OAuth credentials from the Claude Code CLI keychain entry and set `CLAUDE_CREDENTIALS_JSON`. The agent uses `CLAUDE_CODE_OAUTH_TOKEN` internally to authenticate the CLI in headless Docker — this requires the Dockerfile to include `{"hasCompletedOnboarding": true}` in `~/.claude.json` (already configured).
+Extract your OAuth credentials from the Claude Code CLI keychain entry. On macOS:
+```bash
+security find-generic-password -s "Claude Code-credentials" -a "$USER" -w
+```
+
+> **Note:** `~/.claude/.credentials.json` is written by the *agent inside Docker* from `CLAUDE_CREDENTIALS_JSON` — it does NOT exist on your local machine. Use the keychain command above.
+
+Set `CLAUDE_CREDENTIALS_JSON`. The agent uses `CLAUDE_CODE_OAUTH_TOKEN` internally to authenticate the CLI in headless Docker — this requires the Dockerfile to include `{"hasCompletedOnboarding": true}` in `~/.claude.json` (already configured).
 
 **Option B: API key (pay per token)**
 
@@ -289,6 +308,11 @@ railway variables set ANTHROPIC_API_KEY=sk-ant-...
 railway domain    # Save this URL for AGENT_URL and webhook
 ```
 
+> **Railway CLI tips:**
+> - `railway domain` outputs `Service Domain created: 🚀 https://...` — extract URL with `grep -oE 'https://[^ ]+'`
+> - `railway service link` accepts the service name (from `railway service status --all`) or service ID
+> - `railway variables set` can batch: `railway variables set KEY1=val1 KEY2=val2`
+
 #### Docker deployment
 
 ```bash
@@ -323,9 +347,10 @@ gh api repos/OWNER/REPO/hooks \
 2. Open the app — you should see a feedback trigger bar at the bottom-center
 3. Click it, enter your feedback password, send a message
 4. The AI should respond and you can have a conversation
-5. **(+ GitHub)** Submit feedback and check the repo's Issues tab for a new issue with `feedback-bot` label
-6. **(+ Pipeline)** The PipelineTracker should show stage progression: created → queued → running → validating → preview_ready
-7. **(+ Pipeline)** At `preview_ready`, approve/reject/request changes buttons should appear
+5. **(+ GitHub / + Pipeline)** Verify labels exist: `gh label list | grep feedback-bot`
+6. **(+ GitHub)** Submit feedback and check the repo's Issues tab for a new issue with `feedback-bot` label
+7. **(+ Pipeline)** The PipelineTracker should show stage progression: created → queued → running → validating → preview_ready
+8. **(+ Pipeline)** At `preview_ready`, approve/reject/request changes buttons should appear
 
 ### Step 13: Update consumer's CLAUDE.md
 

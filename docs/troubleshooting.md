@@ -127,3 +127,29 @@ The agent looks for comments starting with `**Modifications demandées :**`. Thi
 ## Cross-tab pipeline status not syncing
 
 The widget uses `localStorage['feedback_active_pipeline']` + a custom `pipeline-status` event. Both tabs need to be on the same origin.
+
+## Railway: "No service linked" error
+
+**Cause:** You tried to run `railway variables set` before linking a service. The Railway CLI requires a service to be created and linked first.
+
+**Fix:** Follow this order:
+1. `railway init` — create project
+2. `railway up --detach` — deploy (this creates the service)
+3. `railway service status --all` — find the service name
+4. `railway service link <name>` — link it
+5. Now `railway variables set` will work
+
+## Railway: webhook URL invalid (422 from GitHub)
+
+**Cause:** `railway domain` outputs decorated text like `Service Domain created: 🚀 https://...`. If you copy the full output, the URL contains invisible characters or emoji.
+
+**Fix:** Extract the clean URL:
+```bash
+railway domain 2>&1 | grep -oE 'https://[^ ]+'
+```
+
+## `gh auth token` gives a short-lived token
+
+**Cause:** `gh auth token` returns a `gho_` OAuth token that expires after ~8 hours. This is NOT a Personal Access Token.
+
+**Fix:** Do not use `gh auth token` for `GITHUB_TOKEN`. Generate a PAT (`ghp_` prefix) at [github.com/settings/tokens/new](https://github.com/settings/tokens/new) with `repo` + `workflow` scopes. PATs don't expire (unless you set an expiry).

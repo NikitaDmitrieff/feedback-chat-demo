@@ -93,6 +93,9 @@ curl https://your-domain.railway.app/health
 - You must `railway service link <name>` before `railway variables set` will work
 - `railway service status --all` shows all services and their deploy status
 - Railway auto-redeploys when env vars change — wait for SUCCESS before testing
+- `railway domain` outputs decorated text (emoji + URL) — extract the clean URL with `grep -oE 'https://[^ ]+'`
+- `railway service link` accepts either the service name (from `railway service status --all`) or the service ID (from `railway up --detach` output URL)
+- Combine `railway variables set` calls into one command: `railway variables set KEY1=val1 KEY2=val2`
 
 ## Docker
 
