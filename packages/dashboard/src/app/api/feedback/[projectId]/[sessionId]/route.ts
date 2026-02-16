@@ -28,8 +28,7 @@ export async function PATCH(
   const { sessionId } = await params
   const supabase = await createClient()
 
-  const body = await request.json()
-  const { status } = body
+  const { status } = await request.json()
 
   const { error } = await supabase
     .from('feedback_sessions')

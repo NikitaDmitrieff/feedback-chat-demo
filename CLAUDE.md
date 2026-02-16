@@ -20,7 +20,8 @@ packages/
 │       ├── client/   # React components (FeedbackPanel, PipelineTracker, Thread)
 │       ├── server/   # Route handler factories (createFeedbackHandler, createStatusHandler)
 │       └── cli/      # npx setup wizard
-└── agent/     # Deployable Fastify service (clone → Claude CLI → validate → PR)
+├── agent/     # Deployable Fastify service (clone → Claude CLI → validate → PR)
+└── dashboard/ # Next.js dashboard with project management + feedback intelligence hub
 ```
 
 ## Package Exports
@@ -36,6 +37,17 @@ packages/
 - Client bundle has `"use client"` banner injected by tsup
 - AI SDK v6: uses `inputSchema` (not `parameters`), `stepCountIs()`, `toUIMessageStreamResponse()`
 - Build copies styles.css manually: `tsup && cp src/client/styles.css dist/styles.css`
+
+## Dashboard
+
+- Next.js app at `packages/dashboard/` with Supabase backend
+- Feedback Intelligence Hub: `/projects/[id]/feedback` — AI digest, theme-filtered session list, thread slide-over, tester activity
+- Dashboard API routes: `/api/feedback/[projectId]` (list), `/[sessionId]` (detail/update), `/classify` (AI via Claude Haiku), `/digest` (AI summary), `/testers` (activity)
+- Supabase tables: `feedback_sessions`, `feedback_messages`, `feedback_themes` (public schema, RLS enabled)
+- Widget persistence: `createFeedbackHandler` accepts optional `supabase` config for fire-and-forget conversation storage
+- Dashboard uses `@ai-sdk/anthropic` + `ai` (v6) + `zod` for AI classification/digest
+- Glass-card styling pattern: components use `glass-card`, `stat-card` CSS classes with Tailwind theme colors
+- Dashboard async params: Next.js 15 route handlers use `const { projectId } = await params` pattern
 
 ## Installing in a Consumer App
 

@@ -9,5 +9,170 @@
 - RLS policies matching existing pattern (project ownership)
 - Tables in public schema (consistent with existing dashboard tables)
 
-## Next Task
-Task 2: Dashboard Types
+### Task 2: Dashboard Types ✅
+- Appended 4 types to `packages/dashboard/src/lib/types.ts` after `DeploymentInfo`
+- FeedbackSession, FeedbackMessage, FeedbackTheme, TesterSummary
+- All match spec exactly
+- No issues encountered
+
+### Task 3: Install Dashboard AI Dependencies ✅
+- Installed `@ai-sdk/anthropic` (^3.0.44), `ai` (^6.0.86), `zod` (^4.3.6) in `packages/dashboard`
+- All three confirmed in `dependencies` in package.json
+- No issues encountered
+
+### Task 4: Widget — Supabase Feedback Persistence ✅
+- Added `supabase?` config to `FeedbackHandlerConfig` (url, serviceRoleKey, projectId)
+- Added `persistFeedback` async function with dynamic `@supabase/supabase-js` import
+- Session upsert: finds existing session for same project+tester within last hour, or creates new
+- Message deduplication: only inserts messages not yet persisted (count comparison)
+- Fire-and-forget: `.catch(() => {})` ensures persistence never breaks the chat stream
+- Fixed AI SDK v6 compat: `UIMessage` has no `.content` — uses `.parts` only
+- Type-checks clean, widget builds successfully
+- Commit: `fb29ecb`
+
+### Task 5: Dashboard API — Feedback List + Session Detail ✅
+- Created `packages/dashboard/src/app/api/feedback/[projectId]/route.ts`
+  - GET with query params: theme (contains filter on ai_themes), tester (eq), status (eq)
+  - Orders by last_message_at desc, limit 100
+- Created `packages/dashboard/src/app/api/feedback/[projectId]/[sessionId]/route.ts`
+  - GET: fetches messages ordered by created_at asc
+  - PATCH: updates session status from request body
+- Follows existing patterns: async params, createClient from @/lib/supabase/server, NextResponse.json
+- Type-checks clean
+- Commit: `9f75cf3`
+
+### Task 6: Dashboard API — AI Classification ✅
+- Created `packages/dashboard/src/app/api/feedback/[projectId]/classify/route.ts`
+- POST endpoint accepts `{ sessionId }`, fetches messages + existing themes
+- Calls `generateObject` with Claude Haiku (`claude-haiku-4-5-20251001`) + zod schema
+- Schema: `{ summary: string, themes: string[] (1-3), app_area: string }`
+- Theme matching: case-insensitive match to existing themes, increments count; new themes get auto-assigned colors from 10-color palette
+- Updates session with `ai_summary` and `ai_themes` (array of theme UUIDs)
+- Returns `{ summary, themes, themeIds }`
+- Type-checks clean
+- Commit: `b90e93d`
+
+### Task 7: Dashboard API — AI Digest ✅
+- Created `packages/dashboard/src/app/api/feedback/[projectId]/digest/route.ts`
+- GET endpoint with `period` query param (day or week, defaults to day)
+- Fetches sessions since period, themes ordered by message_count desc
+- Computes stats: total, needsAttention (open), resolved
+- Empty state returns static message with zero stats
+- Calls `generateText` with Claude Haiku for 3-5 actionable sentences
+- Returns `{ digest, stats, topThemes }` matching spec
+- Type-checks clean
+- Commit: `87877e7`
+
+### Task 8: Dashboard API — Tester Summaries ✅
+- Created `packages/dashboard/src/app/api/feedback/[projectId]/testers/route.ts`
+- GET endpoint fetches all sessions + themes for a project
+- Groups sessions by tester_id, computes per-tester stats
+- For each tester: session_count, last_active, top_themes (up to 3 with name/color/count), resolved_count, total_count
+- Theme resolution via themeMap lookup from ai_themes UUIDs
+- Sorted by session_count desc
+- Returns `{ testers: TesterSummary[] }`
+- Type-checks clean
+- Commit: `f370444`
+
+### Task 9: Dashboard Component — Digest Card ✅
+- Created `packages/dashboard/src/components/digest-card.tsx`
+- 'use client' component fetching `/api/feedback/${projectId}/digest?period=${period}`
+- Day/Week toggle with rounded surface container
+- Refresh button (RefreshCw icon, shows Loader2 spinner when loading)
+- Stats row: total conversations, needs attention (amber), resolved (green) — large numbers
+- AI digest text display with empty state fallback
+- Loading state: skeleton shimmer on stats area
+- Matches glassmorphism styling (glass-card, stat-card, existing color patterns)
+- Type-checks clean
+- Commit: `1fb7f00`
+
+### Task 10: Dashboard Component — Feedback Session List ✅
+- Created `packages/dashboard/src/components/feedback-list.tsx`
+- 'use client' component with props: `{ projectId, themes, onSelectSession }`
+- Theme pills row: "All (N)" + per-theme pills with color dots, name, count; clicking toggles filter
+- Session list: glass-card buttons with status dot (green=open, amber=in_progress, checkmark=resolved, gray=dismissed)
+- Each row shows: AI summary (or fallback), tester name, time ago, theme tags as colored pills, message count
+- Empty state with MessageCircle icon
+- Loading state: 3 skeleton shimmers
+- Includes `timeAgo()` utility function
+- Re-fetches when `activeTheme` filter changes
+- Type-checks clean
+- Commit: `b27b9ef`
+
+### Task 11: Dashboard Component — Feedback Slide-Over ✅
+- Created `packages/dashboard/src/components/feedback-slide-over.tsx`
+- 'use client' component matching RunSlideOver pattern (backdrop + right-side panel 480px, z-50)
+- Props: `{ session, themes, projectId, githubRepo, onClose, onStatusChange }`
+- Fetches messages from `/api/feedback/${projectId}/${session.id}` on mount
+- Header: tester name, message count, close button
+- AI summary section with theme pills (if present)
+- GitHub issue link (if session has github_issue_number and githubRepo)
+- Message thread: user messages right-aligned with accent bg, assistant messages left-aligned with surface bg, role labels
+- Action bar: Classify button (Sparkles icon, calls classify POST, only shown if no AI summary), Resolve button (green), Dismiss button (muted) — only when status is 'open'
+- Escape key closes, local session state tracks classification/status changes
+- Type-checks clean
+- Commit: `0847005`
+
+### Task 12: Dashboard Component — Tester Activity ✅
+- Created `packages/dashboard/src/components/tester-activity.tsx`
+- 'use client' component with props: `{ testers: TesterSummary[], onSelectTester: (testerId) => void }`
+- Header: "{N} tester(s) active" count
+- Tester cards: glass-card buttons with name, conversation count, last active time, top theme pills (up to 3 with color)
+- Resolution rate progress bar matching stats-bar.tsx pattern (bg-success bar in bg-surface container)
+- Empty state with Users icon
+- Includes `timeAgo()` utility function (same pattern as feedback-list)
+- Type-checks clean
+- Commit: `52ff9d5`
+
+### Task 13: Dashboard Page — Feedback Page + Client Wrapper ✅
+- Created `packages/dashboard/src/app/projects/[id]/feedback/page.tsx`
+  - Server component: fetches project (id, name, github_repo) + themes from Supabase
+  - 404 via `notFound()` if project not found
+  - Breadcrumb linking back to `/projects/[id]` with project name
+  - Renders `<h1>Feedback</h1>` + `<FeedbackPageClient>`
+- Created `packages/dashboard/src/app/projects/[id]/feedback/client.tsx`
+  - State: tab ('feedback' | 'testers'), selectedSession, testers
+  - Fetches testers when testers tab is active
+  - Layout: DigestCard → tab toggle → FeedbackList/TesterActivity → FeedbackSlideOver
+  - handleStatusChange updates selectedSession in place
+- Type-checks clean
+- Commit: `f47cd03`
+
+### Task 14: Dashboard — Sidebar Feedback Link ✅
+- Modified `packages/dashboard/src/components/sidebar.tsx`
+- Imported `MessageSquare` from lucide-react
+- Extracts `projectId` from pathname via regex `/\/projects\/([^/]+)/`
+- Added contextual Feedback link between Projects link and divider
+- Only visible when `projectId` is truthy (i.e., inside a project)
+- Active state: `pathname.includes('/feedback')` → `bg-white/[0.08] text-fg`
+- Same layout pattern as Projects link (icon in 30x30 container, text when expanded)
+- Type-checks clean
+- Commit: `318079f`
+
+### Task 15: Dashboard — Digest Card on Project Page ✅
+- Modified `packages/dashboard/src/app/projects/[id]/page.tsx`
+- Imported `DigestCard` from `@/components/digest-card`
+- Added `<DigestCard projectId={project.id} />` in a `mb-8` wrapper between StatsBar and SetupChecklist
+- Exactly matches spec placement
+- Type-checks clean
+- Commit: `0a0702b`
+
+### Task 16: Build Verification ✅
+- `npx tsc --noEmit` in dashboard: passed with no errors
+- `npm run build` from repo root: all 3 packages built successfully
+  - Widget: ESM + DTS build success
+  - Agent: tsc build (cached)
+  - Dashboard: Next.js build compiled, all routes generated including new feedback routes
+- No fixes needed — no commit required
+
+### Best Practices ✅
+- **Code simplification**: Ran code-simplifier — destructured searchParams, inlined variables, parallelized Supabase queries with Promise.all, converted usedColors to Set, fixed operator precedence bug in themes cast
+- **Convention fixes**: Added missing `total_count` to TesterSummary type, fixed `Request` → `NextRequest` in testers route, added missing `app_area` to classify schema (all per spec)
+- **Artefacts**: TESTING.md and CHANGELOG.md created/updated in `.artefacts/feedback-intelligence-hub/`
+- **CLAUDE.md**: Added Dashboard section documenting feedback hub architecture, API routes, Supabase tables, patterns
+- **YAGNI check**: No over-engineering detected — implementation matches spec
+- **Epic**: EP-ND-001 marked as `complete`
+- Build verified clean after all fixes
+
+## Status: COMPLETE
+All 16 tasks + best practices done. EP-ND-001 complete.

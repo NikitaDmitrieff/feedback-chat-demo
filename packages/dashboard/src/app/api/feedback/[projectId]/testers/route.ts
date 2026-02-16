@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { FeedbackSession, FeedbackTheme, TesterSummary } from '@/lib/types'
 
 export async function GET(
-  _request: Request,
+  _request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   const { projectId } = await params
@@ -76,6 +76,7 @@ export async function GET(
       last_active: lastActive,
       top_themes: topThemes,
       resolved_count: resolvedCount,
+      total_count: testerSessions.length,
     })
   }
 

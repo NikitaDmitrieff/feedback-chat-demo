@@ -61,4 +61,5 @@ export type TesterSummary = {
   last_active: string
   top_themes: { name: string; color: string; count: number }[]
   resolved_count: number
+  total_count: number
 }

@@ -8,10 +8,10 @@ export async function GET(
   const { projectId } = await params
   const supabase = await createClient()
 
-  const url = request.nextUrl
-  const theme = url.searchParams.get('theme')
-  const tester = url.searchParams.get('tester')
-  const status = url.searchParams.get('status')
+  const { searchParams } = request.nextUrl
+  const theme = searchParams.get('theme')
+  const tester = searchParams.get('tester')
+  const status = searchParams.get('status')
 
   let query = supabase
     .from('feedback_sessions')

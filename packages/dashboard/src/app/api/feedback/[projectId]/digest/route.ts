@@ -11,35 +11,34 @@ export async function GET(
   const { projectId } = await params
   const supabase = await createClient()
 
-  const url = request.nextUrl
-  const period = url.searchParams.get('period') === 'week' ? 'week' : 'day'
+  const period = request.nextUrl.searchParams.get('period') === 'week' ? 'week' : 'day'
 
   const since = new Date()
   since.setDate(since.getDate() - (period === 'week' ? 7 : 1))
 
-  const { data: rawSessions, error: sessionsError } = await supabase
-    .from('feedback_sessions')
-    .select('*')
-    .eq('project_id', projectId)
-    .gte('started_at', since.toISOString())
-    .order('last_message_at', { ascending: false })
+  const [sessionsResult, themesResult] = await Promise.all([
+    supabase
+      .from('feedback_sessions')
+      .select('*')
+      .eq('project_id', projectId)
+      .gte('started_at', since.toISOString())
+      .order('last_message_at', { ascending: false }),
+    supabase
+      .from('feedback_themes')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('message_count', { ascending: false }),
+  ])
 
-  if (sessionsError) {
-    return NextResponse.json({ error: sessionsError.message }, { status: 500 })
+  if (sessionsResult.error) {
+    return NextResponse.json({ error: sessionsResult.error.message }, { status: 500 })
+  }
+  if (themesResult.error) {
+    return NextResponse.json({ error: themesResult.error.message }, { status: 500 })
   }
 
-  const { data: rawThemes, error: themesError } = await supabase
-    .from('feedback_themes')
-    .select('*')
-    .eq('project_id', projectId)
-    .order('message_count', { ascending: false })
-
-  if (themesError) {
-    return NextResponse.json({ error: themesError.message }, { status: 500 })
-  }
-
-  const sessions = (rawSessions ?? []) as FeedbackSession[]
-  const themes = (rawThemes ?? []) as FeedbackTheme[]
+  const sessions = (sessionsResult.data ?? []) as FeedbackSession[]
+  const themes = (themesResult.data ?? []) as FeedbackTheme[]
 
   const total = sessions.length
   const needsAttention = sessions.filter((s) => s.status === 'open').length

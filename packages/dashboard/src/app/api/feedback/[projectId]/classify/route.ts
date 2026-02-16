@@ -25,8 +25,7 @@ export async function POST(
   const { projectId } = await params
   const supabase = await createClient()
 
-  const body = await request.json()
-  const { sessionId } = body
+  const { sessionId } = await request.json()
 
   if (!sessionId) {
     return NextResponse.json({ error: 'sessionId is required' }, { status: 400 })
@@ -55,10 +54,9 @@ export async function POST(
     return NextResponse.json({ error: themesError.message }, { status: 500 })
   }
 
-  const typedMessages = (messages ?? []) as FeedbackMessage[]
   const existingThemes = (rawThemes ?? []) as FeedbackTheme[]
 
-  const conversationText = typedMessages
+  const conversationText = (messages as FeedbackMessage[])
     .map((m) => `${m.role}: ${m.content}`)
     .join('\n')
 
@@ -69,6 +67,7 @@ export async function POST(
     schema: z.object({
       summary: z.string(),
       themes: z.array(z.string()).min(1).max(3),
+      app_area: z.string(),
     }),
     prompt: `Analyze this feedback conversation and classify it.
 
@@ -79,10 +78,12 @@ ${conversationText}
 
 Return:
 - summary: A concise 1-2 sentence summary of the feedback
-- themes: 1-3 theme labels (short, lowercase, e.g. "ui bug", "performance", "feature request"). Reuse existing theme names when they fit.`,
+- themes: 1-3 theme labels (short, lowercase, e.g. "ui bug", "performance", "feature request"). Reuse existing theme names when they fit.
+- app_area: The area of the app this feedback relates to (e.g. "authentication", "dashboard", "settings")`,
   })
 
   const themeIds: string[] = []
+  const usedColors = new Set(existingThemes.map((t) => t.color))
 
   for (const themeName of classification.themes) {
     const existing = existingThemes.find(
@@ -100,9 +101,8 @@ Return:
 
       themeIds.push(existing.id)
     } else {
-      const usedColors = existingThemes.map((t) => t.color)
       const availableColor =
-        THEME_COLORS.find((c) => !usedColors.includes(c)) || THEME_COLORS[themeIds.length % THEME_COLORS.length]
+        THEME_COLORS.find((c) => !usedColors.has(c)) || THEME_COLORS[themeIds.length % THEME_COLORS.length]
 
       const { data: newTheme, error: createError } = await supabase
         .from('feedback_themes')

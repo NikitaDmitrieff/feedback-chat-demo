@@ -42,7 +42,7 @@ export default async function FeedbackPage({
       <FeedbackPageClient
         projectId={project.id}
         githubRepo={project.github_repo}
-        themes={(themes as FeedbackTheme[]) ?? []}
+        themes={((themes ?? []) as FeedbackTheme[])}
       />
     </div>
   )
