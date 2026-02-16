@@ -6,11 +6,13 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
+    "start:managed": "node dist/managed-worker.js",
     "dev": "tsx watch src/server.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
     "fastify": "^5.2.0"
   },
   "devDependencies": {

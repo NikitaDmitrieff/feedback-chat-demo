@@ -11,14 +11,17 @@ import {
   removeLabelFromIssue,
   getIssueComments,
 } from './github.js'
-import { ensureValidToken } from './oauth.js'
+import { ensureValidToken, initCredentials } from './oauth.js'
 import { loadConfig, matchesEnvPattern } from './config.js'
+import type { GitHubConfig } from './github.js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { DbLogger } from './logger.js'
 
 const STEP_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes per build/test step
 const MAX_FIX_ATTEMPTS = 2
 const MIN_RETRY_BUDGET_MS = 3 * 60 * 1000 // need at least 3 min for a retry
 
-interface JobInput {
+export interface JobInput {
   issueNumber: number
   issueTitle: string
   issueBody: string
@@ -350,4 +353,60 @@ export async function runJob(input: JobInput): Promise<void> {
   )
   cleanup(workDir)
   console.log(`[job-${issueNumber}] Done — PR created, awaiting preview`)
+}
+
+// --- Managed worker mode ---
+
+export interface ManagedJobInput extends JobInput {
+  projectId: string
+  github: GitHubConfig
+  claudeCredentials?: string
+  anthropicApiKey?: string
+  runId: string
+  supabase: SupabaseClient
+}
+
+export async function runManagedJob(input: ManagedJobInput): Promise<void> {
+  const logger = new DbLogger(input.supabase, input.runId)
+
+  // Set per-job env vars so existing code paths work
+  process.env.GITHUB_TOKEN = input.github.token
+  process.env.GITHUB_REPO = input.github.repo
+
+  if (input.claudeCredentials) {
+    process.env.CLAUDE_CREDENTIALS_JSON = input.claudeCredentials
+    initCredentials()
+  } else if (input.anthropicApiKey) {
+    process.env.ANTHROPIC_API_KEY = input.anthropicApiKey
+    delete process.env.CLAUDE_CREDENTIALS_JSON
+  }
+
+  // Update pipeline run stage
+  await input.supabase
+    .from('pipeline_runs')
+    .update({ stage: 'running' })
+    .eq('id', input.runId)
+
+  await logger.log(`Starting job for issue #${input.issueNumber}`)
+
+  try {
+    await runJob(input)
+
+    await input.supabase
+      .from('pipeline_runs')
+      .update({ stage: 'validating', completed_at: new Date().toISOString(), result: 'success' })
+      .eq('id', input.runId)
+
+    await logger.log('Job completed successfully')
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+
+    await input.supabase
+      .from('pipeline_runs')
+      .update({ completed_at: new Date().toISOString(), result: 'failed' })
+      .eq('id', input.runId)
+
+    await logger.error(`Job failed: ${msg}`)
+    throw err
+  }
 }

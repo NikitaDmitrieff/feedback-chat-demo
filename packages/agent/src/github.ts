@@ -1,4 +1,7 @@
-function getConfig() {
+export type GitHubConfig = { token: string; repo: string }
+
+function getConfig(override?: GitHubConfig): GitHubConfig {
+  if (override) return override
   const token = process.env.GITHUB_TOKEN
   const repo = process.env.GITHUB_REPO
   if (!token || !repo) {
@@ -29,8 +32,8 @@ async function ghFetch(url: string, options: RequestInit, retries = 3): Promise<
   throw new Error('unreachable')
 }
 
-export async function commentOnIssue(issueNumber: number, body: string): Promise<void> {
-  const { token, repo } = getConfig()
+export async function commentOnIssue(issueNumber: number, body: string, gh?: GitHubConfig): Promise<void> {
+  const { token, repo } = getConfig(gh)
   const res = await ghFetch(
     `https://api.github.com/repos/${repo}/issues/${issueNumber}/comments`,
     {
@@ -44,8 +47,8 @@ export async function commentOnIssue(issueNumber: number, body: string): Promise
   }
 }
 
-export async function labelIssue(issueNumber: number, labels: string[]): Promise<void> {
-  const { token, repo } = getConfig()
+export async function labelIssue(issueNumber: number, labels: string[], gh?: GitHubConfig): Promise<void> {
+  const { token, repo } = getConfig(gh)
   const res = await ghFetch(
     `https://api.github.com/repos/${repo}/issues/${issueNumber}/labels`,
     {
@@ -59,8 +62,8 @@ export async function labelIssue(issueNumber: number, labels: string[]): Promise
   }
 }
 
-export async function closeIssue(issueNumber: number): Promise<void> {
-  const { token, repo } = getConfig()
+export async function closeIssue(issueNumber: number, gh?: GitHubConfig): Promise<void> {
+  const { token, repo } = getConfig(gh)
   const res = await ghFetch(
     `https://api.github.com/repos/${repo}/issues/${issueNumber}`,
     {
@@ -77,9 +80,10 @@ export async function closeIssue(issueNumber: number): Promise<void> {
 export async function createPR(
   issueNumber: number,
   title: string,
-  body: string
+  body: string,
+  gh?: GitHubConfig,
 ): Promise<{ number: number; html_url: string }> {
-  const { token, repo } = getConfig()
+  const { token, repo } = getConfig(gh)
   const res = await ghFetch(
     `https://api.github.com/repos/${repo}/pulls`,
     {
@@ -102,9 +106,10 @@ export async function createPR(
 }
 
 export async function findOpenPR(
-  issueNumber: number
+  issueNumber: number,
+  gh?: GitHubConfig,
 ): Promise<{ number: number; html_url: string } | null> {
-  const { token, repo } = getConfig()
+  const { token, repo } = getConfig(gh)
   const [owner] = repo.split('/')
   const head = `${owner}:feedback/issue-${issueNumber}`
   const res = await ghFetch(
@@ -125,9 +130,10 @@ export async function findOpenPR(
 
 export async function removeLabelFromIssue(
   issueNumber: number,
-  label: string
+  label: string,
+  gh?: GitHubConfig,
 ): Promise<void> {
-  const { token, repo } = getConfig()
+  const { token, repo } = getConfig(gh)
   const res = await ghFetch(
     `https://api.github.com/repos/${repo}/issues/${issueNumber}/labels/${encodeURIComponent(label)}`,
     {
@@ -142,9 +148,10 @@ export async function removeLabelFromIssue(
 
 export async function getIssueComments(
   issueNumber: number,
-  count = 5
+  count = 5,
+  gh?: GitHubConfig,
 ): Promise<{ body: string; created_at: string }[]> {
-  const { token, repo } = getConfig()
+  const { token, repo } = getConfig(gh)
   const res = await ghFetch(
     `https://api.github.com/repos/${repo}/issues/${issueNumber}/comments?per_page=${count}&sort=created&direction=desc`,
     {
