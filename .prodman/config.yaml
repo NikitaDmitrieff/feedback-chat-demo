@@ -1,0 +1,9 @@
+project: feedback-chat
+description: AI-powered feedback widget monorepo
+
+contributors:
+  ND:
+    name: Nikita Dmitrieff
+    counters:
+      epic: 2
+      spec: 2

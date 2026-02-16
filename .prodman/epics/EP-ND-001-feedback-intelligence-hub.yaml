@@ -1,0 +1,56 @@
+# Epic: Feedback Intelligence Hub
+id: EP-ND-001
+title: Feedback Intelligence Hub + Tester Activity
+status: planned
+priority: p1
+owner: ND
+milestone: null
+spec: SPEC-ND-001
+
+description: |
+  Add a Feedback Intelligence Hub to the dashboard. Store all widget conversations in Supabase,
+  use Claude Haiku to cluster feedback into themes, and surface an AI digest + tester activity view.
+  Transforms the dashboard from a pipeline monitor into a product decision tool for solo founders.
+
+technical_scope:
+  backend:
+    - Supabase migration: feedback_sessions, feedback_messages, feedback_themes tables with RLS
+    - API routes: feedback list, session detail, AI classify, AI digest, tester summaries
+    - Widget handler gains optional Supabase persistence (fire-and-forget)
+    - Claude Haiku integration via @ai-sdk/anthropic for classification + digest
+  frontend:
+    - Feedback inbox page with digest card, theme pills, conversation list
+    - Feedback slide-over with thread view, classify action, status actions
+    - Tester activity tab with resolution bars and theme breakdowns
+    - Sidebar gains contextual Feedback link
+    - Project page gains digest summary card
+
+acceptance_criteria:
+  data_layer:
+    - Widget conversations persisted to Supabase when supabase config provided
+    - Sessions track tester identity, message count, AI summary, themes, status
+    - Themes are project-scoped and accumulate over time
+  ai_classification:
+    - Claude Haiku generates one-line summaries for conversations
+    - Haiku assigns 1-3 theme tags, reusing existing themes when possible
+    - Digest generates actionable 3-5 sentence summary with stats
+  feedback_inbox:
+    - Lists all conversations with AI summary, tester name, time, theme tags, status
+    - Theme pills filter conversations by theme
+    - Click opens slide-over with full message thread
+    - Status actions: resolve, dismiss, classify
+  tester_activity:
+    - Shows each tester's conversation count, last active, top themes
+    - Resolution rate bar per tester
+    - Click filters inbox to that tester
+  integration:
+    - Sidebar shows Feedback link when viewing a project
+    - Project page shows digest summary card
+    - Consistent glassmorphism styling with existing dashboard
+
+dependencies: []
+issues: []
+labels: [dashboard, ai, feedback, analytics]
+target_date: null
+created_at: "2026-02-16"
+updated_at: "2026-02-16"
