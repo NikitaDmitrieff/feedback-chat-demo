@@ -1,0 +1,112 @@
+name: QA Onboarding Loop
+
+on:
+  # Manual trigger — start a test run anytime
+  workflow_dispatch:
+
+  # Re-run when a qa-onboarding issue is closed (fix deployed)
+  issues:
+    types: [closed]
+
+  # Re-run after deployment completes (Vercel sends deployment_status)
+  deployment_status:
+
+concurrency:
+  group: qa-onboarding
+  cancel-in-progress: true
+
+jobs:
+  test-onboarding:
+    # Only run on: manual trigger, qa-onboarding issue closed, or successful deploy
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'qa-onboarding')) ||
+      (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: packages/dashboard
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for deployment to be live
+        run: |
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.DASHBOARD_URL }}/login")
+            if [ "$STATUS" = "200" ]; then
+              echo "Dashboard is live"
+              exit 0
+            fi
+            echo "Waiting for dashboard... (attempt $i, status=$STATUS)"
+            sleep 10
+          done
+          echo "Dashboard not reachable after 2 minutes"
+          exit 1
+
+      - name: Run onboarding E2E tests
+        id: e2e
+        continue-on-error: true
+        working-directory: packages/dashboard
+        env:
+          DASHBOARD_URL: ${{ vars.DASHBOARD_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          QA_TEST_EMAIL: ${{ vars.QA_TEST_EMAIL }}
+          QA_TEST_PASSWORD: ${{ secrets.QA_TEST_PASSWORD }}
+        run: npx playwright test onboarding.spec.ts
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: packages/dashboard/test-results/
+          retention-days: 7
+
+      - name: File issue on failure
+        if: steps.e2e.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Parse results and format issue body using tsx for TypeScript support
+          BODY=$(npx tsx -e "
+            import { parseResults, formatIssueBody } from './packages/dashboard/tests/e2e/helpers/report.ts';
+            const results = parseResults('./packages/dashboard/test-results/results.json');
+            const url = 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+            console.log(formatIssueBody(results, url));
+          " 2>/dev/null || echo "QA onboarding tests failed. See [workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.")
+
+          # Check if an open qa-onboarding issue already exists
+          EXISTING=$(gh issue list --label qa-onboarding --state open --json number --jq '.[0].number' 2>/dev/null)
+
+          if [ -n "$EXISTING" ]; then
+            echo "Updating existing issue #$EXISTING"
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            echo "Creating new issue"
+            gh issue create \
+              --title "QA: onboarding test failures — $(date +%Y-%m-%d)" \
+              --label "feedback-bot,auto-implement,qa-onboarding" \
+              --body "$BODY"
+          fi
+
+      - name: Comment on success
+        if: steps.e2e.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh issue list --label qa-onboarding --state open --json number --jq '.[0].number' 2>/dev/null)
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "All onboarding tests passing. Closing."
+            gh issue close "$EXISTING"
+          fi
