@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { SetupChecklist } from '@/components/setup-checklist'
+import { DigestCard } from '@/components/digest-card'
 import { StatsBar } from '@/components/stats-bar'
 import { RunsTable } from '@/components/runs-table'
 import Link from 'next/link'
@@ -60,6 +61,11 @@ export default async function ProjectPage({
 
       {/* Stats bar */}
       <StatsBar runs={runs ?? []} />
+
+      {/* Feedback digest */}
+      <div className="mb-8">
+        <DigestCard projectId={project.id} />
+      </div>
 
       {/* Setup checklist */}
       <SetupChecklist
