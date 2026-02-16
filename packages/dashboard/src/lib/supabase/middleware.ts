@@ -29,6 +29,7 @@ export async function updateSession(request: NextRequest) {
 
   // Redirect unauthenticated users to login (except public routes)
   const isPublicRoute = request.nextUrl.pathname === '/login' ||
+    request.nextUrl.pathname.startsWith('/auth/') ||
     request.nextUrl.pathname.startsWith('/api/webhook') ||
     request.nextUrl.pathname.startsWith('/api/agent')
 
