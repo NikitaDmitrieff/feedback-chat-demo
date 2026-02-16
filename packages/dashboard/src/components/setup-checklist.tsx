@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Check, ChevronDown, Copy, Loader2, Terminal, AlertCircle } from 'lucide-react'
-import { markStepDone } from '@/app/projects/[id]/actions'
+import { Check, ChevronDown, Copy, Loader2, Terminal, AlertCircle, Wand2 } from 'lucide-react'
+import { markStepDone, markAllStepsDone } from '@/app/projects/[id]/actions'
 
 type StepKey = 'install' | 'env_vars' | 'webhook' | 'labels'
 
@@ -38,6 +38,139 @@ function isStepComplete(
 ): boolean {
   if (key === 'first_feedback') return hasRuns
   return !!progress[key]
+}
+
+function generateClaudePrompt({
+  githubRepo,
+  webhookUrl,
+  webhookSecret,
+  agentUrl,
+  apiKey,
+}: {
+  githubRepo: string
+  webhookUrl: string
+  webhookSecret: string
+  agentUrl: string
+  apiKey?: string
+}): string {
+  const apiKeyValue = apiKey ?? '<your FEEDBACK_CHAT_API_KEY>'
+
+  return `Install @nikitadmitrieff/feedback-chat (full Pipeline tier) in this Next.js project.
+
+## Before you start — common blockers that waste 30+ minutes if missed
+
+1. **Tailwind v4 @source is mandatory** — the widget renders completely unstyled without it (step 3)
+2. **React 19.1.0 and 19.1.1 are excluded** by @ai-sdk/react — build will fail (step 1)
+3. **Detect the app directory first** — routes may live in \`app/\` or \`src/app/\` depending on the project
+4. **All 5 env vars are required** — ANTHROPIC_API_KEY, FEEDBACK_CHAT_API_KEY, GITHUB_TOKEN, GITHUB_REPO, AGENT_URL
+5. **FeedbackPanel only accepts \`isOpen\` and \`onToggle\`** — no statusUrl, no apiUrl prop needed
+
+## Dashboard credentials (pre-filled — do NOT change)
+FEEDBACK_CHAT_API_KEY=${apiKeyValue}
+GITHUB_REPO=${githubRepo}
+AGENT_URL=${agentUrl}
+
+## Steps
+
+### 1. Check React version
+Run \`npm ls react\`. If the version is 19.1.0 or 19.1.1, upgrade:
+npm install react@latest react-dom@latest
+
+### 2. Install dependencies
+npm install @nikitadmitrieff/feedback-chat @assistant-ui/react @assistant-ui/react-ai-sdk @assistant-ui/react-markdown ai @ai-sdk/anthropic
+
+### 3. Configure Tailwind to scan the widget (CRITICAL)
+Find the main CSS file (usually \`globals.css\` or \`app/globals.css\`).
+
+**Tailwind v4** (look for \`@import "tailwindcss"\` in the CSS file) — add this line AFTER the import:
+@source "../node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js";
+
+**Tailwind v3** (look for \`tailwind.config.js\` or \`tailwind.config.ts\`) — add to the \`content\` array:
+"./node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js"
+
+Without this, the widget renders with no styles at all.
+
+### 4. Set environment variables in .env.local
+Check which of these already exist and add any that are missing:
+
+ANTHROPIC_API_KEY=<REQUIRED — powers the AI chat. Ask the user if not already in .env.local>
+FEEDBACK_CHAT_API_KEY=${apiKeyValue}
+GITHUB_TOKEN=<REQUIRED — must be a ghp_ PAT (not gho_ OAuth). If not set, ask the user to create one at github.com/settings/tokens/new with repo + workflow scopes>
+GITHUB_REPO=${githubRepo}
+AGENT_URL=${agentUrl}
+
+IMPORTANT: \`GITHUB_TOKEN\` must start with \`ghp_\`. Tokens from \`gh auth token\` start with \`gho_\` and expire in ~8 hours.
+
+### 5. Create chat API route
+Detect whether the project uses \`app/\` or \`src/app/\`, then create \`<app-dir>/api/feedback/chat/route.ts\`:
+
+import { createFeedbackHandler } from '@nikitadmitrieff/feedback-chat/server'
+
+const handler = createFeedbackHandler({
+  password: process.env.FEEDBACK_CHAT_API_KEY!,
+  github: {
+    token: process.env.GITHUB_TOKEN!,
+    repo: process.env.GITHUB_REPO!,
+  },
+})
+
+export const POST = handler.POST
+
+### 6. Create status API route
+Create \`<app-dir>/api/feedback/status/route.ts\`:
+
+import { createStatusHandler } from '@nikitadmitrieff/feedback-chat/server'
+
+const handler = createStatusHandler({
+  password: process.env.FEEDBACK_CHAT_API_KEY!,
+  github: {
+    token: process.env.GITHUB_TOKEN!,
+    repo: process.env.GITHUB_REPO!,
+  },
+  agentUrl: process.env.AGENT_URL,
+})
+
+export const { GET, POST } = handler
+
+### 7. Create client wrapper component
+Create a 'use client' component (e.g., \`components/FeedbackButton.tsx\`):
+
+'use client'
+import { useState } from 'react'
+import { FeedbackPanel } from '@nikitadmitrieff/feedback-chat'
+import '@nikitadmitrieff/feedback-chat/styles.css'
+
+export function FeedbackButton() {
+  const [open, setOpen] = useState(false)
+  return <FeedbackPanel isOpen={open} onToggle={() => setOpen(!open)} />
+}
+
+### 8. Add to root layout
+Import and render \`<FeedbackButton />\` inside \`<body>\` in the root layout (Server Component).
+
+### 9. Create GitHub labels
+gh label create feedback-bot --color 0E8A16 --repo ${githubRepo}
+gh label create auto-implement --color 1D76DB --repo ${githubRepo}
+gh label create in-progress --color FBCA04 --repo ${githubRepo}
+gh label create agent-failed --color D93F0B --repo ${githubRepo}
+gh label create preview-pending --color C5DEF5 --repo ${githubRepo}
+gh label create rejected --color E4E669 --repo ${githubRepo}
+
+### 10. Configure GitHub webhook
+gh api repos/${githubRepo}/hooks \\
+  -f name=web -F active=true \\
+  -f "config[url]=${webhookUrl}" \\
+  -f "config[content_type]=json" \\
+  -f "config[secret]=${webhookSecret}" \\
+  -f 'events[]=issues'
+
+IMPORTANT: Use -F (capital F) for active=true — lowercase -f sends the string "true" which GitHub rejects with HTTP 422.
+
+## After installation
+- **Restart the dev server** after creating the new route files — HMR may not pick them up
+- If routes return 404 or the widget shows raw HTML, clear the cache: rm -rf .next && npm run dev
+- If using Next.js 15+ with Turbopack and seeing persistence/panic errors, switch to Webpack: npx next dev --turbopack=false
+- The password to enter in the widget is the FEEDBACK_CHAT_API_KEY value: ${apiKeyValue}`
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -94,6 +227,26 @@ export function SetupChecklist({
   const [progress, setProgress] = useState(setupProgress)
   const [isPending, startTransition] = useTransition()
   const [pendingStep, setPendingStep] = useState<string | null>(null)
+  const [showClaudePrompt, setShowClaudePrompt] = useState(false)
+
+  const claudePrompt = generateClaudePrompt({
+    githubRepo,
+    webhookUrl,
+    webhookSecret,
+    agentUrl,
+    apiKey,
+  })
+
+  function handleMarkAllDone() {
+    setPendingStep('all')
+    startTransition(async () => {
+      await markAllStepsDone(projectId)
+      setProgress({ install: true, env_vars: true, webhook: true, labels: true })
+      setPendingStep(null)
+      setShowClaudePrompt(false)
+      setExpandedIndex(-1)
+    })
+  }
 
   function handleMarkDone(key: StepKey) {
     setPendingStep(key)
@@ -146,6 +299,56 @@ export function SetupChecklist({
         <Terminal className="h-4 w-4 text-muted" />
         <span className="flex-1 text-sm font-medium text-fg">Setup</span>
         <span className="text-xs text-muted tabular-nums">{completedCount}/{STEPS.length}</span>
+      </div>
+
+      {/* Claude Code quick setup */}
+      <div className="border-b border-edge">
+        <button
+          onClick={() => setShowClaudePrompt(!showClaudePrompt)}
+          className="flex w-full items-center gap-2.5 px-5 py-2.5 text-left transition-colors hover:bg-surface-hover"
+        >
+          <Wand2 className="h-3.5 w-3.5 text-accent" />
+          <span className="flex-1 text-xs font-medium text-fg">Setup with Claude Code</span>
+          <ChevronDown
+            className={`h-3 w-3 text-muted/50 transition-transform ${showClaudePrompt ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {showClaudePrompt && (
+          <div className="space-y-3 px-5 pb-4">
+            <p className="text-xs text-muted">
+              Copy this prompt and paste it into Claude Code in your project directory.
+              It contains all your project credentials and setup instructions.
+            </p>
+            <div className="relative">
+              <div className="absolute right-2 top-2 z-10">
+                <CopyButton text={claudePrompt} />
+              </div>
+              <pre className="code-block max-h-48 overflow-y-auto pr-20 text-[10px] leading-relaxed">
+                {claudePrompt}
+              </pre>
+            </div>
+            {!apiKey && (
+              <div className="flex items-start gap-2 rounded-lg bg-elevated/50 px-3 py-2">
+                <AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-muted" />
+                <p className="text-[11px] text-muted">
+                  The API key placeholder needs to be replaced with the key you saved during project creation.
+                </p>
+              </div>
+            )}
+            <button
+              onClick={handleMarkAllDone}
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-[11px] font-medium text-accent transition-all hover:bg-accent/20 disabled:opacity-50"
+            >
+              {pendingStep === 'all' ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Check className="h-3 w-3" />
+              )}
+              I&apos;ve completed setup
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Steps */}
@@ -262,6 +465,9 @@ function StepContent({
     case 'install':
       return (
         <div className="space-y-2">
+          <p className="text-xs text-muted">
+            First, check your React version — <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">react@19.1.0</code> and <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">19.1.1</code> are excluded by <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">@ai-sdk/react</code>. Run <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">npm ls react</code> and upgrade if needed.
+          </p>
           <p className="text-xs text-muted">Install the widget and its peer dependencies:</p>
           <CodeBlock>
             {`npm install @nikitadmitrieff/feedback-chat \\
@@ -269,9 +475,19 @@ function StepContent({
   @assistant-ui/react-markdown ai @ai-sdk/anthropic`}
           </CodeBlock>
           <p className="text-xs text-muted">
-            Then add the Tailwind v4 source directive to your <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">globals.css</code>:
+            Then add the Tailwind source directive to your <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">globals.css</code>. <strong>Tailwind v4</strong> (after <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">@import &quot;tailwindcss&quot;</code>):
           </p>
           <CodeBlock>{`@source "../node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js";`}</CodeBlock>
+          <p className="text-xs text-muted">
+            <strong>Tailwind v3</strong> — add to the <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">content</code> array in <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">tailwind.config.js</code>:
+          </p>
+          <CodeBlock>{`"./node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js"`}</CodeBlock>
+          <div className="flex items-start gap-2 rounded-lg bg-danger/5 px-3 py-2">
+            <AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-danger" />
+            <p className="text-[11px] text-danger/80">
+              Without this directive, the widget renders completely unstyled.
+            </p>
+          </div>
         </div>
       )
 
@@ -282,8 +498,11 @@ function StepContent({
             Add to your app&apos;s <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">.env.local</code>:
           </p>
           <CodeBlock>
-            {`AGENT_URL=${agentUrl}
-FEEDBACK_CHAT_API_KEY=${apiKey ?? 'fc_live_...'}`}
+            {`ANTHROPIC_API_KEY=<your Anthropic API key>
+FEEDBACK_CHAT_API_KEY=${apiKey ?? 'fc_live_...'}
+GITHUB_TOKEN=<ghp_ PAT with repo + workflow scopes>
+GITHUB_REPO=${githubRepo}
+AGENT_URL=${agentUrl}`}
           </CodeBlock>
           {apiKey && (
             <div className="flex items-start gap-2 rounded-lg bg-danger/5 px-3 py-2">
@@ -293,6 +512,12 @@ FEEDBACK_CHAT_API_KEY=${apiKey ?? 'fc_live_...'}`}
               </p>
             </div>
           )}
+          <div className="flex items-start gap-2 rounded-lg bg-elevated/50 px-3 py-2">
+            <AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-muted" />
+            <p className="text-[11px] text-muted">
+              <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">GITHUB_TOKEN</code> must be a <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">ghp_</code> PAT. Tokens from <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">gh auth token</code> (<code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">gho_</code>) expire in ~8h.
+            </p>
+          </div>
         </div>
       )
 
@@ -311,12 +536,18 @@ Events: Issues`}
           <p className="text-xs text-muted">Or run this command:</p>
           <CodeBlock>
             {`gh api repos/${githubRepo}/hooks \\
-  -f name=web -f active=true \\
+  -f name=web -F active=true \\
   -f "config[url]=${webhookUrl}" \\
   -f "config[content_type]=json" \\
   -f "config[secret]=${webhookSecret}" \\
   -f 'events[]=issues'`}
           </CodeBlock>
+          <div className="flex items-start gap-2 rounded-lg bg-elevated/50 px-3 py-2">
+            <AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-muted" />
+            <p className="text-[11px] text-muted">
+              Use <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">-F</code> (capital) for <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">active=true</code> — lowercase <code className="rounded bg-elevated px-1 py-0.5 font-[family-name:var(--font-mono)] text-fg">-f</code> sends the string &quot;true&quot; and GitHub returns 422.
+            </p>
+          </div>
         </div>
       )
 

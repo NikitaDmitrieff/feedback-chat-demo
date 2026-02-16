@@ -8,6 +8,9 @@ export type StatusHandlerConfig = {
   }
   /** Agent URL for checking if the agent is currently running a job */
   agentUrl?: string
+  /** Vercel Automation Bypass Secret — appended to preview URLs to bypass Deployment Protection.
+   *  Falls back to VERCEL_AUTOMATION_BYPASS_SECRET env var. */
+  vercelBypassSecret?: string
 }
 
 export type Stage =
@@ -164,6 +167,7 @@ async function deriveStage(
   config: GitHubConfig,
   issueNumber: number,
   agentUrl?: string,
+  vercelBypassSecret?: string,
 ): Promise<DeriveResult | null> {
   const issue = await getIssue(config, issueNumber)
   if (!issue) return null
@@ -202,12 +206,12 @@ async function deriveStage(
   if (labels.includes('preview-pending')) {
     const pr = await findPR(config, issueNumber)
     if (pr) {
-      const previewUrl = await getPreviewUrl(config, pr.head_sha)
-      if (previewUrl) {
+      const rawPreviewUrl = await getPreviewUrl(config, pr.head_sha)
+      if (rawPreviewUrl) {
         return {
           stage: 'preview_ready',
           issueUrl,
-          previewUrl,
+          previewUrl: applyVercelBypass(rawPreviewUrl, vercelBypassSecret),
           prNumber: pr.number,
           prUrl: pr.html_url,
         }
@@ -404,6 +408,16 @@ function resolveAgentUrl(config: StatusHandlerConfig): string | undefined {
   return config.agentUrl ?? process.env.AGENT_URL
 }
 
+function resolveVercelBypassSecret(config: StatusHandlerConfig): string | undefined {
+  return config.vercelBypassSecret ?? process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+}
+
+function applyVercelBypass(url: string, secret: string | undefined): string {
+  if (!secret) return url
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}x-vercel-protection-bypass=${encodeURIComponent(secret)}&x-vercel-set-bypass-cookie=samesitenone`
+}
+
 /**
  * Creates Next.js App Router GET and POST handlers for the feedback status endpoint.
  * Returns `{ GET, POST }` ready to be exported from a route.ts file.
@@ -425,7 +439,8 @@ export function createStatusHandler(config: StatusHandlerConfig) {
     }
 
     const agentUrl = resolveAgentUrl(config)
-    const result = await deriveStage(ghConfig, issueNumber, agentUrl)
+    const vercelBypass = resolveVercelBypassSecret(config)
+    const result = await deriveStage(ghConfig, issueNumber, agentUrl, vercelBypass)
     if (!result) {
       return Response.json({ error: 'Issue not found' }, { status: 404 })
     }

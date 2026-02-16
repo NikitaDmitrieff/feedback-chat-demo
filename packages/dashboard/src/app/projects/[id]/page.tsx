@@ -60,8 +60,9 @@ export default async function ProjectPage({
 
   const hasRuns = !!runs && runs.length > 0
   const setupProgress = (project.setup_progress as Record<string, boolean>) ?? {}
-  const webhookUrl = `https://app.feedback.chat/api/webhook/${project.id}`
-  const agentUrl = `https://app.feedback.chat/api/agent/${project.id}`
+  const baseUrl = process.env.APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'http://localhost:3001')
+  const webhookUrl = `${baseUrl}/api/webhook/${project.id}`
+  const agentUrl = `${baseUrl}/api/agent/${project.id}`
 
   return (
     <>

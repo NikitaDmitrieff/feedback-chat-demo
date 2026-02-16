@@ -5,3 +5,5 @@ dist/
 .turbo/
 *.tsbuildinfo
 .DS_Store
+.superdesign
+.vercel

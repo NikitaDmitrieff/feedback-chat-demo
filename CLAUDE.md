@@ -149,6 +149,7 @@ const handler = createStatusHandler({
     token: process.env.GITHUB_TOKEN!,
     repo: process.env.GITHUB_REPO!,
   },
+  vercelBypassSecret: process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
 })
 
 export const { GET, POST } = handler
@@ -166,6 +167,7 @@ const handler = createStatusHandler({
     repo: process.env.GITHUB_REPO!,
   },
   agentUrl: process.env.AGENT_URL,
+  vercelBypassSecret: process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
 })
 
 export const { GET, POST } = handler
@@ -217,6 +219,7 @@ ANTHROPIC_API_KEY=sk-ant-...       # Required
 FEEDBACK_PASSWORD=your-password    # Required
 GITHUB_TOKEN=ghp_...              # MUST be a PAT (ghp_ prefix), NOT an OAuth token (gho_)
 GITHUB_REPO=owner/repo            # e.g. nikitadmitrieff/my-app
+VERCEL_AUTOMATION_BYPASS_SECRET=...# Recommended — see Step 8b
 ```
 
 **IMPORTANT: `GITHUB_TOKEN` must start with `ghp_` (Personal Access Token).** Tokens starting with `gho_` are short-lived GitHub OAuth tokens that expire after ~8 hours. Generate a PAT at https://github.com/settings/tokens/new with `repo` + `workflow` scopes.
@@ -231,7 +234,21 @@ FEEDBACK_PASSWORD=your-password    # Required
 GITHUB_TOKEN=ghp_...              # MUST be a PAT (ghp_ prefix)
 GITHUB_REPO=owner/repo            # e.g. nikitadmitrieff/my-app
 AGENT_URL=https://your-agent.railway.app
+VERCEL_AUTOMATION_BYPASS_SECRET=...# Recommended — see Step 8b
 ```
+
+### Step 8b: Configure Vercel preview bypass (+ GitHub and + Pipeline)
+
+**This step is required if your Vercel project has Deployment Protection enabled** (on by default for Pro/Enterprise plans). Without it, preview URLs in the widget return 401 and users can't see the agent's changes.
+
+1. Go to your Vercel project → **Settings** → **Deployment Protection**
+2. Under **Protection Bypass for Automation**, click **Generate Secret**
+3. Copy the generated secret
+4. Add it as `VERCEL_AUTOMATION_BYPASS_SECRET` in your `.env.local` **and** in your Vercel project's Environment Variables (so preview builds can also access it)
+
+The status handler automatically appends this secret to preview URLs, bypassing Deployment Protection without disabling it.
+
+> **How it works:** Vercel's bypass appends `?x-vercel-protection-bypass=<secret>` to the URL and sets a cookie so subsequent navigations on the preview also work. This is Vercel's official mechanism for CI/CD and automation tools.
 
 ### Step 9: Create GitHub labels (+ GitHub and + Pipeline only)
 
@@ -334,7 +351,7 @@ Or automate (**note the `config[content_type]=json` — without it, GitHub sends
 
 ```bash
 gh api repos/OWNER/REPO/hooks \
-  -f name=web -f active=true \
+  -f name=web -F active=true \
   -f "config[url]=https://your-agent.railway.app/webhook/github" \
   -f "config[content_type]=json" \
   -f "config[secret]=WEBHOOK_SECRET_VALUE" \
@@ -416,6 +433,11 @@ Add this section to the consumer project's CLAUDE.md:
 - The agent runs as a non-root `agent` user — Claude Code CLI refuses `--dangerously-skip-permissions` as root
 - The agent uses `CLAUDE_CODE_OAUTH_TOKEN` env var (not credentials file) to authenticate the CLI in headless Docker. This requires `~/.claude.json` with `{"hasCompletedOnboarding": true}` (see [anthropics/claude-code#8938](https://github.com/anthropics/claude-code/issues/8938))
 - When creating GitHub webhooks via `gh api`, you MUST use `config[content_type]=json` — the default is `form-urlencoded` which the Fastify agent rejects with 415
+- When creating GitHub webhooks via `gh api`, use `-F active=true` (capital F) — lowercase `-f` sends the string `"true"` and GitHub returns 422
+- `ANTHROPIC_API_KEY` is required in the consumer's `.env.local` — the AI chat handler reads it from the environment to create the Anthropic client
+- `GITHUB_TOKEN` and `GITHUB_REPO` must be in `.env.local` or passed to both `createFeedbackHandler` and `createStatusHandler` — without them, issue creation silently fails and the status panel breaks
+- After installing the widget routes, the consumer should restart the dev server — HMR may not pick up new route files
+- Next.js 15+ with Turbopack may have cache corruption issues after dependency changes — if routes return 404 or the dev server panics, clear `.next/` and restart (or use `--turbopack=false`)
 
 ## Credential Security
 

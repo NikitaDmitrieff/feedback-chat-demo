@@ -156,7 +156,7 @@ function cleanup(workDir: string) {
   }
 }
 
-export async function runJob(input: JobInput): Promise<void> {
+export async function runJob(input: JobInput): Promise<{ success: boolean }> {
   const config = loadConfig()
   const { issueNumber, issueTitle, issueBody } = input
   const workDir = `/tmp/job-${issueNumber}`
@@ -171,7 +171,7 @@ export async function runJob(input: JobInput): Promise<void> {
   } catch (err) {
     await commentOnIssue(issueNumber, `Agent could not parse issue body: ${err}`)
     await labelIssue(issueNumber, ['agent-failed'])
-    return
+    return { success: false }
   }
 
   // Mark as in-progress
@@ -200,7 +200,7 @@ export async function runJob(input: JobInput): Promise<void> {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     await fail(issueNumber, `Clone or ${config.installCommand} failed`, msg, workDir)
-    return
+    return { success: false }
   }
 
   // 2b. Pre-lint: catch pre-existing errors before Claude touches anything
@@ -256,7 +256,7 @@ export async function runJob(input: JobInput): Promise<void> {
       msg,
       workDir
     )
-    return
+    return { success: false }
   }
 
   // 4. Validate with escalating fix retry loop
@@ -306,7 +306,7 @@ export async function runJob(input: JobInput): Promise<void> {
       result.errorOutput,
       workDir
     )
-    return
+    return { success: false }
   }
 
   // 5. Branch + PR
@@ -323,7 +323,7 @@ export async function runJob(input: JobInput): Promise<void> {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     await fail(issueNumber, 'Git branch/push failed', msg, workDir)
-    return
+    return { success: false }
   }
 
   // 6. Create PR if none exists
@@ -342,7 +342,7 @@ export async function runJob(input: JobInput): Promise<void> {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     await fail(issueNumber, 'PR creation failed', msg, workDir)
-    return
+    return { success: false }
   }
 
   // 7. Update labels and comment
@@ -355,6 +355,7 @@ export async function runJob(input: JobInput): Promise<void> {
   )
   cleanup(workDir)
   console.log(`[job-${issueNumber}] Done — PR created, awaiting preview`)
+  return { success: true }
 }
 
 // --- Managed worker mode ---
@@ -392,7 +393,17 @@ export async function runManagedJob(input: ManagedJobInput): Promise<void> {
   await logger.log(`Starting job for issue #${input.issueNumber}`)
 
   try {
-    await runJob(input)
+    const result = await runJob(input)
+
+    if (!result.success) {
+      await input.supabase
+        .from('pipeline_runs')
+        .update({ stage: 'running', completed_at: new Date().toISOString(), result: 'failed' })
+        .eq('id', input.runId)
+
+      await logger.error('Job failed (agent reported failure on GitHub)')
+      throw new Error('runJob returned failure')
+    }
 
     await input.supabase
       .from('pipeline_runs')

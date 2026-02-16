@@ -2,6 +2,22 @@
 
 import { createClient } from '@/lib/supabase/server'
 
+export async function markAllStepsDone(projectId: string) {
+  const supabase = await createClient()
+
+  await supabase
+    .from('projects')
+    .update({
+      setup_progress: {
+        install: true,
+        env_vars: true,
+        webhook: true,
+        labels: true,
+      },
+    })
+    .eq('id', projectId)
+}
+
 export async function markStepDone(projectId: string, stepKey: string) {
   const supabase = await createClient()
 

@@ -163,7 +163,7 @@ echo "==> Setting up GitHub webhook..."
 REPO_OWNER=$(echo "${githubRepo}" | cut -d/ -f1)
 REPO_NAME=$(echo "${githubRepo}" | cut -d/ -f2)
 gh api "repos/$REPO_OWNER/$REPO_NAME/hooks" \\
-  -f name=web -f active=true \\
+  -f name=web -F active=true \\
   -f "config[url]=$AGENT_URL/webhook/github" \\
   -f "config[content_type]=json" \\
   -f "config[secret]=$WEBHOOK_SECRET" \\

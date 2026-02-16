@@ -178,7 +178,7 @@ Or via CLI (**note `config[content_type]=json`** — without it GitHub defaults 
 
 ```bash
 gh api repos/OWNER/REPO/hooks \
-  -f name=web -f active=true \
+  -f name=web -F active=true \
   -f "config[url]=https://your-agent.railway.app/webhook/github" \
   -f "config[content_type]=json" \
   -f "config[secret]=YOUR_WEBHOOK_SECRET" \
