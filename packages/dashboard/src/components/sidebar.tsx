@@ -27,63 +27,67 @@ export function Sidebar() {
     <aside
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`fixed left-3 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-1 overflow-hidden rounded-[22px] border border-edge bg-bg/70 p-2 shadow-[0_8px_32px_rgba(0,0,0,0.24),0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur-xl transition-all duration-200 ease-in-out ${
-        expanded ? 'w-[180px]' : 'w-[48px]'
+      className={`fixed left-3 top-1/2 z-40 -translate-y-1/2 overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.04] p-1.5 shadow-[0_8px_40px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-1px_0_rgba(255,255,255,0.02)] backdrop-blur-2xl transition-all duration-200 ease-in-out ${
+        expanded ? 'w-[172px]' : 'w-[52px]'
       }`}
     >
       {/* Logo */}
       <Link
         href="/projects"
-        className="flex h-9 w-full shrink-0 items-center gap-2.5 rounded-[14px] px-2 text-sm font-medium text-fg transition-colors hover:bg-surface-hover"
+        className={`flex items-center rounded-[16px] transition-colors hover:bg-white/[0.06] ${
+          expanded ? 'gap-2.5 px-2 py-2' : 'justify-center p-1.5'
+        }`}
       >
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] bg-elevated">
-          <MessageSquareText className="h-3.5 w-3.5 text-muted" />
+        <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[12px] bg-white/[0.08]">
+          <MessageSquareText className="h-[14px] w-[14px] text-muted" />
         </div>
-        {expanded && <span className="truncate text-xs">Feedback Chat</span>}
+        {expanded && <span className="truncate text-xs font-medium text-fg">Feedback Chat</span>}
       </Link>
 
       {/* Divider */}
-      <div className="my-0.5 h-px w-6 bg-edge" />
+      <div className={`my-1 h-px bg-white/[0.06] ${expanded ? 'mx-2' : 'mx-auto w-5'}`} />
 
       {/* Projects */}
       <Link
         href="/projects"
-        className={`flex h-9 w-full shrink-0 items-center gap-2.5 rounded-[14px] px-2 text-sm transition-colors ${
+        className={`flex items-center rounded-[16px] transition-colors ${
           pathname === '/projects' || pathname === '/'
-            ? 'bg-surface text-fg'
-            : 'text-muted hover:bg-surface-hover hover:text-fg'
-        }`}
+            ? 'bg-white/[0.08] text-fg'
+            : 'text-muted hover:bg-white/[0.06] hover:text-fg'
+        } ${expanded ? 'gap-2.5 px-2 py-2' : 'justify-center p-1.5'}`}
       >
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center">
-          <FolderKanban className="h-3.5 w-3.5" />
+        <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center">
+          <FolderKanban className="h-[15px] w-[15px]" />
         </div>
         {expanded && <span className="truncate text-xs">Projects</span>}
       </Link>
 
       {/* Divider */}
-      <div className="my-0.5 h-px w-6 bg-edge" />
+      <div className={`my-1 h-px bg-white/[0.06] ${expanded ? 'mx-2' : 'mx-auto w-5'}`} />
 
       {/* Pin toggle — only when expanded */}
       {expanded && (
         <button
           onClick={togglePin}
-          className="flex h-9 w-full shrink-0 items-center gap-2.5 rounded-[14px] px-2 text-muted transition-colors hover:bg-surface-hover hover:text-fg"
+          className="flex w-full items-center gap-2.5 rounded-[16px] px-2 py-2 text-muted transition-colors hover:bg-white/[0.06] hover:text-fg"
         >
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center">
-            {pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+          <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center">
+            {pinned ? <PinOff className="h-[14px] w-[14px]" /> : <Pin className="h-[14px] w-[14px]" />}
           </div>
           <span className="truncate text-xs">{pinned ? 'Unpin' : 'Pin'}</span>
         </button>
       )}
 
       {/* Sign out */}
-      <form action="/auth/signout" method="post" className="w-full">
+      <form action="/auth/signout" method="post">
         <button
           type="submit"
-          className="flex h-9 w-full shrink-0 items-center gap-2.5 rounded-[14px] px-2 text-muted transition-colors hover:bg-surface-hover hover:text-fg"
+          className={`flex w-full items-center rounded-[16px] text-muted transition-colors hover:bg-white/[0.06] hover:text-fg ${
+            expanded ? 'gap-2.5 px-2 py-2' : 'justify-center p-1.5'
+          }`}
         >
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center">
-            <LogOut className="h-3.5 w-3.5" />
+          <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center">
+            <LogOut className="h-[14px] w-[14px]" />
           </div>
           {expanded && <span className="truncate text-xs">Sign out</span>}
         </button>
