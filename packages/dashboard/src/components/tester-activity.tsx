@@ -1,16 +1,8 @@
 'use client'
 
 import { Users } from 'lucide-react'
+import { timeAgo } from '@/lib/format'
 import type { TesterSummary } from '@/lib/types'
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
 
 export function TesterActivity({
   testers,
@@ -77,7 +69,6 @@ export function TesterActivity({
                     )}
                   </div>
 
-                  {/* Resolution rate bar */}
                   <div className="mt-2.5 flex items-center gap-3">
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface">
                       <div

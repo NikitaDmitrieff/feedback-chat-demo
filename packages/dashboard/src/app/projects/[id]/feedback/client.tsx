@@ -79,7 +79,7 @@ export function FeedbackPageClient({ projectId, githubRepo, themes }: Props) {
       ) : (
         <TesterActivity
           testers={testers}
-          onSelectTester={(testerId) => setTab('feedback')}
+          onSelectTester={() => setTab('feedback')}
         />
       )}
 

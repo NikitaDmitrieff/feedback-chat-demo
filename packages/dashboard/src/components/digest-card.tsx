@@ -30,14 +30,12 @@ export function DigestCard({ projectId }: { projectId: string }) {
 
   return (
     <div className="glass-card p-5">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-fg">
           <Sparkles className="h-4 w-4 text-accent" />
           <span className="text-sm font-semibold">AI Digest</span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Day/Week toggle */}
           <div className="flex rounded-lg bg-surface p-0.5">
             <button
               onClick={() => setPeriod('day')}
@@ -56,7 +54,6 @@ export function DigestCard({ projectId }: { projectId: string }) {
               Week
             </button>
           </div>
-          {/* Refresh */}
           <button
             onClick={fetchDigest}
             disabled={loading}
@@ -71,7 +68,6 @@ export function DigestCard({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      {/* Stats row */}
       {loading ? (
         <div className="mt-4 grid grid-cols-3 gap-3">
           <div className="skeleton h-14 rounded-lg" />
@@ -105,7 +101,6 @@ export function DigestCard({ projectId }: { projectId: string }) {
             </div>
           </div>
 
-          {/* AI digest text */}
           <div className="mt-4">
             {data.stats.total === 0 ? (
               <p className="text-sm text-muted">No feedback this {period}.</p>

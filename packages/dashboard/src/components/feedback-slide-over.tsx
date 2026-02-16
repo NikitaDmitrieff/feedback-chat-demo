@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Loader2, Sparkles, X, ExternalLink, AlertCircle } from 'lucide-react'
 import type { FeedbackMessage, FeedbackSession, FeedbackTheme } from '@/lib/types'
 
@@ -27,9 +27,8 @@ export function FeedbackSlideOver({
   const [localSession, setLocalSession] = useState(session)
   const threadRef = useRef<HTMLDivElement>(null)
 
-  const themeMap = new Map(themes.map((t) => [t.id, t]))
+  const themeMap = useMemo(() => new Map(themes.map((t) => [t.id, t])), [themes])
 
-  // Fetch messages on mount
   useEffect(() => {
     setLoading(true)
     fetch(`/api/feedback/${projectId}/${session.id}`)
@@ -39,25 +38,19 @@ export function FeedbackSlideOver({
       .finally(() => setLoading(false))
   }, [projectId, session.id])
 
-  // Scroll to bottom when messages load
   useEffect(() => {
     if (threadRef.current) {
       threadRef.current.scrollTop = threadRef.current.scrollHeight
     }
   }, [messages])
 
-  // Escape key closes
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    },
-    [onClose]
-  )
-
   useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
+  }, [onClose])
 
   async function handleClassify() {
     setClassifying(true)
@@ -94,12 +87,9 @@ export function FeedbackSlideOver({
 
   return (
     <>
-      {/* Backdrop */}
       <div className="slide-over-backdrop" onClick={onClose} />
 
-      {/* Panel */}
       <div className="fixed top-0 right-0 z-50 flex h-screen w-full max-w-[480px] flex-col border-l border-edge bg-bg/95 backdrop-blur-xl">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-edge px-6 py-4">
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-fg">
@@ -117,9 +107,7 @@ export function FeedbackSlideOver({
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-5" ref={threadRef}>
-          {/* AI summary section */}
           {localSession.ai_summary && (
             <div className="mb-5 rounded-lg bg-surface p-4">
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted">
@@ -149,7 +137,6 @@ export function FeedbackSlideOver({
             </div>
           )}
 
-          {/* GitHub issue link */}
           {localSession.github_issue_number && githubRepo && (
             <div className="mb-5">
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted">
@@ -168,7 +155,6 @@ export function FeedbackSlideOver({
             </div>
           )}
 
-          {/* Message thread */}
           <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted">
             Conversation
           </h3>
@@ -203,7 +189,6 @@ export function FeedbackSlideOver({
           )}
         </div>
 
-        {/* Action bar */}
         <div className="flex items-center gap-2 border-t border-edge px-6 py-4">
           {!localSession.ai_summary && (
             <button

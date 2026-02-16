@@ -34,13 +34,10 @@ export type FeedbackHandlerConfig = {
 }
 
 function extractTextContent(message: UIMessage): string {
-  if (message.parts) {
-    return message.parts
-      .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-      .map((p) => p.text)
-      .join('\n')
-  }
-  return ''
+  return message.parts
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+    .map((p) => p.text)
+    .join('\n')
 }
 
 async function persistFeedback(
@@ -58,7 +55,6 @@ async function persistFeedback(
   const testerId = 'anonymous'
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
-  // Find existing session for same project + tester within last hour
   const { data: existing } = await supabase
     .from('feedback_sessions')
     .select('id, message_count')
@@ -90,7 +86,6 @@ async function persistFeedback(
     existingCount = 0
   }
 
-  // Only insert messages not yet persisted (based on count comparison)
   const newMessages = messages.slice(existingCount)
   if (newMessages.length > 0) {
     const rows = newMessages.map((m) => ({
@@ -101,7 +96,6 @@ async function persistFeedback(
     await supabase.from('feedback_messages').insert(rows)
   }
 
-  // Update session metadata
   await supabase
     .from('feedback_sessions')
     .update({
@@ -124,7 +118,6 @@ export function createFeedbackHandler(config: FeedbackHandlerConfig) {
       return Response.json({ error: 'Invalid password' }, { status: 401 })
     }
 
-    // Password-only check (no messages) — return 200 to confirm access
     if (!messages.length) {
       return Response.json({ ok: true })
     }
@@ -135,8 +128,6 @@ export function createFeedbackHandler(config: FeedbackHandlerConfig) {
     const systemPrompt =
       config.systemPrompt ?? buildDefaultPrompt(config.projectContext)
 
-    // Build the GitHub issue creator if config is provided,
-    // otherwise fall back to env-var-based creator
     let issueCreator: GitHubIssueCreator | undefined
     if (config.github) {
       const { token, repo, labels } = config.github
@@ -169,7 +160,6 @@ export function createFeedbackHandler(config: FeedbackHandlerConfig) {
         }
       }
     } else {
-      // Fall back to env-var-based GitHub issue creation
       issueCreator = createGitHubIssue
     }
 

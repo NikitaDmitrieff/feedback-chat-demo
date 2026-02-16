@@ -31,7 +31,6 @@ export async function POST(
     return NextResponse.json({ error: 'sessionId is required' }, { status: 400 })
   }
 
-  // Fetch all messages for the session
   const { data: messages, error: messagesError } = await supabase
     .from('feedback_messages')
     .select('*')
@@ -46,8 +45,7 @@ export async function POST(
     return NextResponse.json({ error: 'No messages found for session' }, { status: 404 })
   }
 
-  // Fetch existing themes for this project
-  const { data: existingThemes, error: themesError } = await supabase
+  const { data: rawThemes, error: themesError } = await supabase
     .from('feedback_themes')
     .select('*')
     .eq('project_id', projectId)
@@ -56,14 +54,14 @@ export async function POST(
     return NextResponse.json({ error: themesError.message }, { status: 500 })
   }
 
-  // Build conversation text for the AI
+  const existingThemes = rawThemes ?? []
+
   const conversationText = messages
     .map((m: { role: string; content: string }) => `${m.role}: ${m.content}`)
     .join('\n')
 
-  const existingThemeNames = (existingThemes || []).map((t: { name: string }) => t.name)
+  const existingThemeNames = existingThemes.map((t: { name: string }) => t.name)
 
-  // Call Claude Haiku for classification
   const { object: classification } = await generateObject({
     model: anthropic('claude-haiku-4-5-20251001'),
     schema: z.object({
@@ -84,16 +82,14 @@ Return:
 - app_area: The area of the app this feedback relates to (e.g. "navigation", "settings", "onboarding")`,
   })
 
-  // Process themes: match existing or create new
   const themeIds: string[] = []
 
   for (const themeName of classification.themes) {
-    const existing = (existingThemes || []).find(
+    const existing = existingThemes.find(
       (t: { name: string }) => t.name.toLowerCase() === themeName.toLowerCase()
     )
 
     if (existing) {
-      // Update existing theme
       await supabase
         .from('feedback_themes')
         .update({
@@ -104,8 +100,7 @@ Return:
 
       themeIds.push(existing.id)
     } else {
-      // Create new theme with auto-assigned color
-      const usedColors = (existingThemes || []).map((t: { color: string }) => t.color)
+      const usedColors = existingThemes.map((t: { color: string }) => t.color)
       const availableColor =
         THEME_COLORS.find((c) => !usedColors.includes(c)) || THEME_COLORS[themeIds.length % THEME_COLORS.length]
 
@@ -129,7 +124,6 @@ Return:
     }
   }
 
-  // Update session with AI summary and themes
   const { error: updateError } = await supabase
     .from('feedback_sessions')
     .update({

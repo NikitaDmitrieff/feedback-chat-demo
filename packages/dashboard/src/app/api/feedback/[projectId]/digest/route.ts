@@ -16,8 +16,7 @@ export async function GET(
   const since = new Date()
   since.setDate(since.getDate() - (period === 'week' ? 7 : 1))
 
-  // Fetch sessions since the period
-  const { data: sessions, error: sessionsError } = await supabase
+  const { data: rawSessions, error: sessionsError } = await supabase
     .from('feedback_sessions')
     .select('*')
     .eq('project_id', projectId)
@@ -28,8 +27,7 @@ export async function GET(
     return NextResponse.json({ error: sessionsError.message }, { status: 500 })
   }
 
-  // Fetch themes ordered by message_count desc
-  const { data: themes, error: themesError } = await supabase
+  const { data: rawThemes, error: themesError } = await supabase
     .from('feedback_themes')
     .select('*')
     .eq('project_id', projectId)
@@ -39,9 +37,12 @@ export async function GET(
     return NextResponse.json({ error: themesError.message }, { status: 500 })
   }
 
-  const total = sessions?.length || 0
-  const needsAttention = sessions?.filter((s: { status: string }) => s.status === 'open').length || 0
-  const resolved = sessions?.filter((s: { status: string }) => s.status === 'resolved').length || 0
+  const sessions = rawSessions ?? []
+  const themes = rawThemes ?? []
+
+  const total = sessions.length
+  const needsAttention = sessions.filter((s: { status: string }) => s.status === 'open').length
+  const resolved = sessions.filter((s: { status: string }) => s.status === 'resolved').length
 
   if (total === 0) {
     return NextResponse.json({
@@ -51,13 +52,13 @@ export async function GET(
     })
   }
 
-  const topThemes = (themes || []).slice(0, 5).map((t: { id: string; name: string; message_count: number }) => ({
+  const topThemes = themes.slice(0, 5).map((t: { id: string; name: string; message_count: number }) => ({
     id: t.id,
     name: t.name,
     count: t.message_count,
   }))
 
-  const summaries = (sessions || [])
+  const summaries = sessions
     .filter((s: { ai_summary: string | null }) => s.ai_summary)
     .map((s: { ai_summary: string }) => `- ${s.ai_summary}`)
     .join('\n')

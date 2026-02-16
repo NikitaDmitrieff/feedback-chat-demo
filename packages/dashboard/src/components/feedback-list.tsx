@@ -1,17 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Loader2, MessageCircle } from 'lucide-react'
+import { timeAgo } from '@/lib/format'
 import type { FeedbackSession, FeedbackTheme } from '@/lib/types'
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
 
 const STATUS_DOT: Record<FeedbackSession['status'], string> = {
   open: 'bg-success',
@@ -33,7 +25,7 @@ export function FeedbackList({
   const [loading, setLoading] = useState(true)
   const [activeTheme, setActiveTheme] = useState<string | null>(null)
 
-  const themeMap = new Map(themes.map((t) => [t.id, t]))
+  const themeMap = useMemo(() => new Map(themes.map((t) => [t.id, t])), [themes])
 
   const fetchSessions = useCallback(async () => {
     setLoading(true)
@@ -55,7 +47,6 @@ export function FeedbackList({
 
   return (
     <div>
-      {/* Theme pills row */}
       <div className="mb-4 flex flex-wrap gap-2">
         <button
           onClick={() => setActiveTheme(null)}
@@ -86,7 +77,6 @@ export function FeedbackList({
         ))}
       </div>
 
-      {/* Session list */}
       {loading ? (
         <div className="space-y-3">
           <div className="skeleton h-20 rounded-lg" />
@@ -109,7 +99,6 @@ export function FeedbackList({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    {/* Status dot */}
                     {session.status === 'resolved' ? (
                       <Check className="h-3 w-3 shrink-0 text-success" />
                     ) : (
@@ -122,7 +111,6 @@ export function FeedbackList({
                     </p>
                   </div>
 
-                  {/* Bottom line */}
                   <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted">
                     <span>{session.tester_name || 'Anonymous'}</span>
                     <span className="text-white/10">&middot;</span>
@@ -153,7 +141,6 @@ export function FeedbackList({
                   </div>
                 </div>
 
-                {/* Message count */}
                 <span className="shrink-0 text-xs tabular-nums text-muted">
                   {session.message_count}
                 </span>
