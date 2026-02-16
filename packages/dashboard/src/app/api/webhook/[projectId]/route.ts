@@ -67,19 +67,20 @@ export async function POST(
   const triggeredBy = payload.issue?.user?.login ?? null
 
   // Enqueue job
-  const { error: jobError } = await supabase.from('job_queue').insert({
+  const { data: job, error: jobError } = await supabase.from('job_queue').insert({
     project_id: project.id,
     github_issue_number: issue.number,
     issue_title: issue.title ?? '',
     issue_body: issue.body ?? '',
-  })
+  }).select('id').single()
 
-  if (jobError) {
+  if (jobError || !job) {
     return NextResponse.json({ error: 'Failed to enqueue' }, { status: 500 })
   }
 
-  // Create pipeline run record
+  // Create pipeline run record linked to the job
   await supabase.from('pipeline_runs').insert({
+    job_id: job.id,
     project_id: project.id,
     github_issue_number: issue.number,
     stage: 'queued',
