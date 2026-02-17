@@ -5,10 +5,16 @@ const PASSWORD = process.env.QA_TEST_PASSWORD || 'qa-test-password-2026'
 
 export async function signIn(page: Page) {
   await page.goto('/login')
+  // Wait for client-side hydration (dynamic import with ssr: false)
+  await page.waitForSelector('[placeholder="Email address"]', { timeout: 10_000 })
   await page.fill('[placeholder="Email address"]', EMAIL)
   await page.fill('[placeholder="Password"]', PASSWORD)
-  await page.click('button[type="submit"]')
-  await page.waitForURL('**/projects', { timeout: 10_000 })
+  // Button is disabled until both fields are filled
+  const submitBtn = page.getByRole('button', { name: 'Sign in' })
+  await submitBtn.waitFor({ state: 'attached' })
+  await page.waitForTimeout(500) // allow React state to propagate
+  await submitBtn.click()
+  await page.waitForURL('**/projects', { timeout: 15_000 })
 }
 
 export async function createTestProject(page: Page, name?: string) {

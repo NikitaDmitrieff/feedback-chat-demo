@@ -8,17 +8,20 @@ test.describe('Onboarding flow', () => {
   test('Step 1: can sign in to the dashboard', async ({ page }) => {
     await page.goto('/login')
 
-    // Should see the login page
-    await expect(page.locator('text=Feedback Chat')).toBeVisible()
-    await expect(page.locator('text=Sign in')).toBeVisible()
+    // Wait for the client-side page to hydrate (dynamic import with ssr: false)
+    await expect(page.getByRole('heading', { name: 'Feedback Chat' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
 
     // Fill credentials
     await page.fill('[placeholder="Email address"]', EMAIL)
     await page.fill('[placeholder="Password"]', PASSWORD)
-    await page.click('button[type="submit"]')
 
-    // Should redirect to /projects
-    await page.waitForURL('**/projects', { timeout: 10_000 })
+    // Wait for button to be enabled (disabled until fields are filled)
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeEnabled()
+    await page.getByRole('button', { name: 'Sign in' }).click()
+
+    // Should redirect to /projects (uses window.location.href, full page load)
+    await page.waitForURL('**/projects', { timeout: 15_000 })
     await expect(page.locator('text=Projects')).toBeVisible()
   })
 
