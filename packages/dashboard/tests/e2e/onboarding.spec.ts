@@ -26,35 +26,17 @@ test.describe('Onboarding flow', () => {
   })
 
   test('Step 2: can create a new project', async ({ page }) => {
-    await signIn(page)
+    const { projectName } = await createTestProject(page)
 
-    // Click New Project
-    await page.click('text=New Project')
-    await page.waitForURL('**/projects/new')
-
-    // Fill the form
-    const projectName = `qa-test-${Date.now()}`
-    await page.fill('input[name="name"]', projectName)
-    await page.fill('input[name="github_repo"]', 'NikitaDmitrieff/european-art-vault')
-
-    // Select Claude OAuth
-    await page.selectOption('select[name="credential_type"]', 'claude_oauth')
-
-    // Leave credential value empty for now (test creation without creds)
-    await page.click('button[type="submit"]')
-
-    // Should redirect to project detail page
-    await page.waitForURL(/\/projects\/[a-f0-9-]+/, { timeout: 15_000 })
+    // Should see the project name on the detail page
+    await expect(page.locator(`text=${projectName}`)).toBeVisible()
 
     // Should see setup checklist
     await expect(page.locator('text=Setup')).toBeVisible()
-
-    // Should see the project name
-    await expect(page.locator(`text=${projectName}`)).toBeVisible()
   })
 
   test('Step 3: setup checklist renders with correct URLs', async ({ page }) => {
-    const { url } = await createTestProject(page)
+    await createTestProject(page)
 
     // Verify checklist steps are visible
     await expect(page.locator('text=Install the widget')).toBeVisible()
