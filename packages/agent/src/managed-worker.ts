@@ -1,5 +1,6 @@
 import { createSupabaseClient } from './supabase.js'
 import { runManagedJob } from './worker.js'
+import { runSetupJob } from './setup-worker.js'
 type Supabase = ReturnType<typeof createSupabaseClient>
 
 const POLL_INTERVAL_MS = 5_000
@@ -61,27 +62,50 @@ async function findRunId(supabase: Supabase, projectId: string, issueNumber: num
 async function processJob(supabase: Supabase, job: {
   id: string
   project_id: string
+  job_type?: string
   github_issue_number: number
   issue_title: string
   issue_body: string
 }) {
-  console.log(`[${WORKER_ID}] Processing job ${job.id} (issue #${job.github_issue_number})`)
+  console.log(`[${WORKER_ID}] Processing job ${job.id} (type=${job.job_type ?? 'implement'}, issue #${job.github_issue_number})`)
 
   try {
-    const creds = await fetchCredentials(supabase, job.project_id)
-    const github = await fetchGithubConfig(supabase, job.project_id)
-    const runId = await findRunId(supabase, job.project_id, job.github_issue_number)
+    // Dispatch based on job type
+    if (job.job_type === 'setup') {
+      const { data: project } = await supabase
+        .from('projects')
+        .select('github_repo, github_installation_id')
+        .eq('id', job.project_id)
+        .single()
 
-    await runManagedJob({
-      issueNumber: job.github_issue_number,
-      issueTitle: job.issue_title,
-      issueBody: job.issue_body,
-      projectId: job.project_id,
-      github,
-      ...creds,
-      runId,
-      supabase,
-    })
+      if (!project?.github_installation_id) {
+        throw new Error('Setup job requires github_installation_id on the project')
+      }
+
+      await runSetupJob({
+        jobId: job.id,
+        projectId: job.project_id,
+        githubRepo: project.github_repo,
+        installationId: project.github_installation_id,
+        supabase,
+      })
+    } else {
+      // Default: implement job (existing flow)
+      const creds = await fetchCredentials(supabase, job.project_id)
+      const github = await fetchGithubConfig(supabase, job.project_id)
+      const runId = await findRunId(supabase, job.project_id, job.github_issue_number)
+
+      await runManagedJob({
+        issueNumber: job.github_issue_number,
+        issueTitle: job.issue_title,
+        issueBody: job.issue_body,
+        projectId: job.project_id,
+        github,
+        ...creds,
+        runId,
+        supabase,
+      })
+    }
 
     await supabase
       .from('job_queue')
