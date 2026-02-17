@@ -248,6 +248,66 @@ export async function closeArtifacts(
 }
 
 // ---------------------------------------------------------------------------
+// PR merge
+// ---------------------------------------------------------------------------
+
+/**
+ * Merge a pull request on GitHub.
+ */
+export async function mergePR(repo: string, prNumber: number): Promise<void> {
+  const res = await fetch(`${API}/repos/${repo}/pulls/${prNumber}/merge`, {
+    method: 'PUT',
+    headers: headers(),
+    body: JSON.stringify({ merge_method: 'squash' }),
+  })
+  if (!res.ok) {
+    throw new Error(`mergePR failed: ${res.status} ${await res.text()}`)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Issue creation (direct API — bypasses widget UI)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a GitHub issue in the agent's expected format.
+ * Matches the body structure produced by the widget's submit_request tool
+ * so the agent can parse it with parseIssueBody().
+ */
+export async function createIssue(
+  repo: string,
+  prompt: string,
+  summary: string = 'QA pipeline test change',
+): Promise<IssueState> {
+  const body = [
+    `## Generated Prompt\n\n\`\`\`\n${prompt}\n\`\`\``,
+    `## Metadata\n\n- **Type:** simple\n- **Submitted by:** QA Bot`,
+    `<!-- agent-meta: ${JSON.stringify({ prompt_type: 'simple', visitor_name: 'QA Bot' })} -->`,
+  ].join('\n\n')
+
+  const res = await fetch(`${API}/repos/${repo}/issues`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      title: `[Feedback] ${summary}`,
+      body,
+      labels: ['feedback-bot', 'auto-implement'],
+    }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`createIssue failed: ${res.status} ${await res.text()}`)
+  }
+
+  const data = await res.json()
+  return {
+    number: data.number,
+    state: data.state as 'open' | 'closed',
+    labels: (data.labels as Array<{ name: string }>).map((l) => l.name),
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Webhook management (dynamic per test run)
 // ---------------------------------------------------------------------------
 
