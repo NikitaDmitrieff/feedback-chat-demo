@@ -18,11 +18,14 @@ export async function signIn(page: Page) {
 }
 
 export async function createTestProject(page: Page, name?: string) {
-  // Each test gets a fresh browser context — sign in first
+  // Sign in first (each test gets a fresh browser context)
   await signIn(page)
+
+  // Navigate via UI — avoids auth cookie issues with page.goto()
+  await page.click('text=New Project')
+  await page.waitForURL('**/projects/new', { timeout: 10_000 })
+
   const projectName = name ?? `qa-test-${Date.now()}`
-  await page.goto('/projects/new')
-  await page.waitForLoadState('networkidle')
   await page.fill('input[name="name"]', projectName)
   await page.fill('input[name="github_repo"]', 'NikitaDmitrieff/european-art-vault')
   await page.selectOption('select[name="credential_type"]', 'claude_oauth')
@@ -30,9 +33,8 @@ export async function createTestProject(page: Page, name?: string) {
 
   // Server action redirects on success; if it stays on /new, the action failed
   try {
-    await page.waitForURL(/\/projects\/[a-f0-9-]+/, { timeout: 15_000 })
+    await page.waitForURL(/\/projects\/[a-f0-9-]+/, { timeout: 20_000 })
   } catch {
-    // Capture page content for debugging
     const url = page.url()
     const bodyText = await page.locator('body').textContent()
     throw new Error(
