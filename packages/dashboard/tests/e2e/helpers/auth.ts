@@ -58,3 +58,37 @@ export async function createTestProject(page: Page, name?: string) {
 
   return { projectName, url: page.url() }
 }
+
+export async function createPipelineProject(page: Page) {
+  await signIn(page)
+
+  const projectName = `qa-pipeline-${Date.now()}`
+
+  // Look up the test user's ID
+  const auth = authAdmin()
+  const { data: { users } } = await auth.auth.admin.listUsers()
+  const testUser = users.find((u) => u.email === EMAIL)
+  if (!testUser) throw new Error('Test user not found — run global setup first')
+
+  // Create project pointing to the sandbox repo for pipeline E2E tests
+  const supabase = adminClient()
+  const webhookSecret = process.env.WEBHOOK_SECRET || crypto.randomBytes(32).toString('hex')
+  const { data: project, error } = await supabase
+    .from('projects')
+    .insert({
+      name: projectName,
+      github_repo: process.env.SANDBOX_REPO || 'NikitaDmitrieff/qa-feedback-sandbox',
+      webhook_secret: webhookSecret,
+      user_id: testUser.id,
+    })
+    .select('id')
+    .single()
+
+  if (error) throw new Error(`Failed to create pipeline project: ${error.message}`)
+
+  // Navigate to the project detail page
+  await page.goto(`/projects/${project.id}`)
+  await page.waitForLoadState('networkidle')
+
+  return { projectId: project.id, projectName, url: page.url() }
+}
