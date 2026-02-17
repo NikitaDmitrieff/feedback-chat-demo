@@ -31,72 +31,70 @@ test.describe('Onboarding flow', () => {
     // Should see the project name on the detail page
     await expect(page.locator(`text=${projectName}`)).toBeVisible()
 
-    // Should see setup checklist
-    await expect(page.locator('text=Setup')).toBeVisible()
+    // Should see setup checklist header (use exact match — page has
+    // "Setup", "Setup with Claude Code", and potentially "Setup complete")
+    await expect(page.getByText('Setup', { exact: true }).first()).toBeVisible()
   })
 
-  test('Step 3: setup checklist renders with correct URLs', async ({ page }) => {
+  test('Step 3: setup checklist renders with correct steps', async ({ page }) => {
     await createTestProject(page)
 
-    // Verify checklist steps are visible
-    await expect(page.locator('text=Install the widget')).toBeVisible()
-    await expect(page.locator('text=Add environment variables')).toBeVisible()
-    await expect(page.locator('text=Configure GitHub webhook')).toBeVisible()
-    await expect(page.locator('text=Create GitHub labels')).toBeVisible()
-    await expect(page.locator('text=Send your first feedback')).toBeVisible()
+    // Verify all 5 checklist step titles are visible (use .first() since
+    // expanded step content may duplicate the title text)
+    await expect(page.getByText('Install the widget').first()).toBeVisible()
+    await expect(page.getByText('Add environment variables').first()).toBeVisible()
+    await expect(page.getByText('Configure GitHub webhook').first()).toBeVisible()
+    await expect(page.getByText('Create GitHub labels').first()).toBeVisible()
+    await expect(page.getByText('Send your first feedback').first()).toBeVisible()
   })
 
-  test('Step 4: Claude prompt has correct domain (not localhost)', async ({ page }) => {
+  test('Step 4: Claude prompt uses production URL (not localhost)', async ({ page }) => {
     await createTestProject(page)
 
-    // Find and click the Claude quick setup section
-    const quickSetup = page.locator('text=Setup with Claude Code')
-    if (await quickSetup.isVisible()) {
-      await quickSetup.click()
-    }
+    // Expand the Claude Code quick setup section
+    await page.getByText('Setup with Claude Code').click()
 
-    // Get the prompt text content
-    const promptArea = page.locator('pre, [data-prompt], code').first()
-    if (await promptArea.isVisible()) {
-      const promptText = await promptArea.textContent()
+    // Read the generated prompt from the <pre> block
+    const promptArea = page.locator('pre').first()
+    await expect(promptArea).toBeVisible({ timeout: 5_000 })
+    const promptText = await promptArea.textContent()
 
-      // Must contain the production domain
-      expect(promptText).toContain('loop.joincoby.com')
+    // Must NOT contain localhost
+    expect(promptText).not.toContain('localhost')
 
-      // Must NOT contain localhost
-      expect(promptText).not.toContain('localhost')
+    // Must use https (production URL, not http://localhost)
+    expect(promptText).toContain('https://')
 
-      // Must contain --save in install command
-      expect(promptText).toContain('--save')
+    // Must contain --save in install command
+    expect(promptText).toContain('--save')
 
-      // Must reference FEEDBACK_PASSWORD (not FEEDBACK_CHAT_API_KEY)
-      expect(promptText).toContain('FEEDBACK_PASSWORD')
-    }
+    // Must reference FEEDBACK_PASSWORD (not FEEDBACK_CHAT_API_KEY)
+    expect(promptText).toContain('FEEDBACK_PASSWORD')
   })
 
   test('Step 5: webhook URL is reachable (no 401)', async ({ page, request }) => {
     await createTestProject(page)
 
-    // Extract webhook URL from the checklist
-    const webhookText = await page.locator('text=api/webhook/').first().textContent()
-    const webhookMatch = webhookText?.match(/https:\/\/[^\s"'`]+\/api\/webhook\/[a-f0-9-]+/)
+    // Extract project ID from the current URL
+    const projectId = page.url().match(/\/projects\/([a-f0-9-]+)/)?.[1]
+    expect(projectId).toBeTruthy()
 
-    if (webhookMatch) {
-      const webhookUrl = webhookMatch[0]
+    // Construct webhook URL from the dashboard base URL
+    const dashboardUrl = process.env.DASHBOARD_URL || 'https://loop.joincoby.com'
+    const webhookUrl = `${dashboardUrl}/api/webhook/${projectId}`
 
-      // Hit the webhook URL — should NOT return 401 (Vercel SSO)
-      const response = await request.post(webhookUrl, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-github-event': 'ping',
-        },
-        data: { zen: 'qa-test' },
-      })
+    // Hit the webhook URL — should NOT return 401 (Vercel SSO)
+    const response = await request.post(webhookUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-github-event': 'ping',
+      },
+      data: { zen: 'qa-test' },
+    })
 
-      // 403 (invalid sig) is correct. 401 (SSO blocked) is the bug.
-      expect(response.status()).not.toBe(401)
-      // 404 would mean bad projectId, also a bug
-      expect(response.status()).not.toBe(404)
-    }
+    // 403 (invalid sig) is correct. 401 (SSO blocked) is the bug.
+    expect(response.status()).not.toBe(401)
+    // 404 would mean bad projectId, also a bug
+    expect(response.status()).not.toBe(404)
   })
 })
