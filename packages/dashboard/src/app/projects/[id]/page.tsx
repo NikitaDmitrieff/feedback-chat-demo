@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { SetupChecklist } from '@/components/setup-checklist'
+import { SetupWizard } from '@/components/setup-wizard'
+import type { SetupStatus } from '@/lib/types'
 import { DigestCard } from '@/components/digest-card'
 import { StatsBar } from '@/components/stats-bar'
 import { RunsTable } from '@/components/runs-table'
@@ -20,7 +22,7 @@ export default async function ProjectPage({
 
   const { data: project } = await supabase
     .from('projects')
-    .select('id, name, github_repo, webhook_secret, created_at, setup_progress')
+    .select('id, name, github_repo, webhook_secret, created_at, setup_progress, github_installation_id, setup_status, setup_pr_url, setup_error')
     .eq('id', id)
     .single()
 
@@ -67,17 +69,28 @@ export default async function ProjectPage({
         <DigestCard projectId={project.id} />
       </div>
 
-      {/* Setup checklist */}
-      <SetupChecklist
-        projectId={project.id}
-        githubRepo={project.github_repo}
-        webhookSecret={webhookSecret ?? project.webhook_secret}
-        apiKey={apiKey}
-        webhookUrl={webhookUrl}
-        agentUrl={agentUrl}
-        setupProgress={setupProgress}
-        hasRuns={hasRuns}
-      />
+      {/* Setup */}
+      {project.github_installation_id ? (
+        <SetupWizard
+          projectId={project.id}
+          githubRepo={project.github_repo}
+          installationId={project.github_installation_id}
+          initialStatus={(project.setup_status ?? 'pending') as SetupStatus}
+          initialPrUrl={project.setup_pr_url ?? null}
+          initialError={project.setup_error ?? null}
+        />
+      ) : (
+        <SetupChecklist
+          projectId={project.id}
+          githubRepo={project.github_repo}
+          webhookSecret={webhookSecret ?? project.webhook_secret}
+          apiKey={apiKey}
+          webhookUrl={webhookUrl}
+          agentUrl={agentUrl}
+          setupProgress={setupProgress}
+          hasRuns={hasRuns}
+        />
+      )}
 
       {/* Runs table */}
       <div className="mb-8">
