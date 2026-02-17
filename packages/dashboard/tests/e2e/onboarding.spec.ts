@@ -22,7 +22,7 @@ test.describe('Onboarding flow', () => {
 
     // Should redirect to /projects (uses window.location.href, full page load)
     await page.waitForURL('**/projects', { timeout: 15_000 })
-    await expect(page.locator('text=Projects')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible()
   })
 
   test('Step 2: can create a new project', async ({ page }) => {
