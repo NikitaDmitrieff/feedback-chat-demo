@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { SetupChecklist } from '@/components/setup-checklist'
 import { SetupWizard } from '@/components/setup-wizard'
 import type { SetupStatus } from '@/lib/types'
 import { DigestCard } from '@/components/digest-card'
@@ -11,13 +10,10 @@ import { ArrowLeft, Github } from 'lucide-react'
 
 export default async function ProjectPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ apiKey?: string; webhookSecret?: string }>
 }) {
   const { id } = await params
-  const { apiKey, webhookSecret } = await searchParams
   const supabase = await createClient()
 
   const { data: project } = await supabase
@@ -36,10 +32,6 @@ export default async function ProjectPage({
     .limit(50)
 
   const hasRuns = !!runs && runs.length > 0
-  const setupProgress = (project.setup_progress as Record<string, boolean>) ?? {}
-  const baseUrl = process.env.APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'http://localhost:3001')
-  const webhookUrl = `${baseUrl}/api/webhook/${project.id}`
-  const agentUrl = `${baseUrl}/api/agent/${project.id}`
 
   return (
     <div className="mx-auto max-w-5xl px-6 pt-10 pb-16">
@@ -55,10 +47,12 @@ export default async function ProjectPage({
       {/* Project header */}
       <div className="mb-8">
         <h1 className="text-lg font-medium text-fg">{project.name}</h1>
-        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted">
-          <Github className="h-3 w-3" />
-          {project.github_repo}
-        </div>
+        {project.github_repo && (
+          <div className="mt-1.5 flex items-center gap-2 text-xs text-muted">
+            <Github className="h-3 w-3" />
+            {project.github_repo}
+          </div>
+        )}
       </div>
 
       {/* Stats bar */}
@@ -70,27 +64,14 @@ export default async function ProjectPage({
       </div>
 
       {/* Setup */}
-      {project.github_installation_id ? (
-        <SetupWizard
-          projectId={project.id}
-          githubRepo={project.github_repo}
-          installationId={project.github_installation_id}
-          initialStatus={(project.setup_status ?? 'pending') as SetupStatus}
-          initialPrUrl={project.setup_pr_url ?? null}
-          initialError={project.setup_error ?? null}
-        />
-      ) : (
-        <SetupChecklist
-          projectId={project.id}
-          githubRepo={project.github_repo}
-          webhookSecret={webhookSecret ?? project.webhook_secret}
-          apiKey={apiKey}
-          webhookUrl={webhookUrl}
-          agentUrl={agentUrl}
-          setupProgress={setupProgress}
-          hasRuns={hasRuns}
-        />
-      )}
+      <SetupWizard
+        projectId={project.id}
+        githubRepo={project.github_repo ?? ''}
+        installationId={project.github_installation_id ?? null}
+        initialStatus={(project.setup_status ?? 'pending') as SetupStatus}
+        initialPrUrl={project.setup_pr_url ?? null}
+        initialError={project.setup_error ?? null}
+      />
 
       {/* Runs table */}
       <div className="mb-8">
