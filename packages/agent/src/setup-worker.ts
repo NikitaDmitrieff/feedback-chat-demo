@@ -72,13 +72,14 @@ export async function runSetupJob(input: SetupJobInput): Promise<void> {
       .limit(1)
       .single()
 
+    const credsPath = join(homedir(), '.claude', '.credentials.json')
+
     if (cred) {
       if (cred.type === 'claude_oauth') {
-        // Set CLAUDE_CREDENTIALS_JSON so initCredentials() writes the file
+        // Project-level OAuth: write it, refresh if needed, extract access token
         process.env.CLAUDE_CREDENTIALS_JSON = cred.encrypted_value
         initCredentials()
         await ensureValidToken()
-        const credsPath = join(homedir(), '.claude', '.credentials.json')
         if (existsSync(credsPath)) {
           const credsData = JSON.parse(readFileSync(credsPath, 'utf-8'))
           claudeEnv.CLAUDE_CODE_OAUTH_TOKEN = credsData?.claudeAiOauth?.accessToken
@@ -86,6 +87,15 @@ export async function runSetupJob(input: SetupJobInput): Promise<void> {
         }
       } else {
         claudeEnv.ANTHROPIC_API_KEY = cred.encrypted_value
+      }
+    } else {
+      // No project credential — use the system credential written at worker startup
+      if (existsSync(credsPath)) {
+        const credsData = JSON.parse(readFileSync(credsPath, 'utf-8'))
+        claudeEnv.CLAUDE_CODE_OAUTH_TOKEN = credsData?.claudeAiOauth?.accessToken
+        delete claudeEnv.ANTHROPIC_API_KEY
+      } else if (process.env.ANTHROPIC_API_KEY) {
+        claudeEnv.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
       }
     }
 

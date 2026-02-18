@@ -2,6 +2,7 @@ import { createSupabaseClient } from './supabase.js'
 import { runManagedJob } from './worker.js'
 import { runSetupJob } from './setup-worker.js'
 import { getInstallationToken, isGitHubAppConfigured } from './github-app.js'
+import { initCredentials, ensureValidToken } from './oauth.js'
 type Supabase = ReturnType<typeof createSupabaseClient>
 
 const POLL_INTERVAL_MS = 5_000
@@ -23,12 +24,21 @@ async function fetchCredentials(supabase: Supabase, projectId: string) {
     .eq('project_id', projectId)
     .single()
 
-  if (!data) throw new Error(`No credentials for project ${projectId}`)
-
-  return {
-    claudeCredentials: data.type === 'claude_oauth' ? data.encrypted_value : undefined,
-    anthropicApiKey: data.type === 'anthropic_api_key' ? data.encrypted_value : undefined,
+  if (data) {
+    return {
+      claudeCredentials: data.type === 'claude_oauth' ? data.encrypted_value : undefined,
+      anthropicApiKey: data.type === 'anthropic_api_key' ? data.encrypted_value : undefined,
+    }
   }
+
+  // Fall back to system credentials (the dashboard owner's credential)
+  const claudeCredentials = process.env.CLAUDE_CREDENTIALS_JSON
+  const anthropicApiKey = process.env.ANTHROPIC_API_KEY
+  if (!claudeCredentials && !anthropicApiKey) {
+    throw new Error(`No credentials for project ${projectId} and no system credential configured`)
+  }
+  console.log(`[${WORKER_ID}] No project credential found — using system credential`)
+  return { claudeCredentials, anthropicApiKey }
 }
 
 async function fetchGithubConfig(supabase: Supabase, projectId: string) {
@@ -131,6 +141,11 @@ async function processJob(supabase: Supabase, job: {
 async function main() {
   const supabase = createSupabaseClient()
   console.log(`[${WORKER_ID}] Starting managed worker, polling every ${POLL_INTERVAL_MS}ms`)
+
+  // Initialize system Claude credential at startup and ensure it's fresh
+  if (initCredentials()) {
+    await ensureValidToken()
+  }
 
   while (true) {
     const job = await pollForJobs(supabase)
