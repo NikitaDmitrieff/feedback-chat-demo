@@ -42,7 +42,13 @@ packages/
 
 - Next.js app at `packages/dashboard/` with Supabase backend
 - Feedback Intelligence Hub: `/projects/[id]/feedback` — AI digest, theme-filtered session list, thread slide-over, tester activity
-- Dashboard API routes: `/api/feedback/[projectId]` (list), `/[sessionId]` (detail/update), `/classify` (AI via Claude Haiku), `/digest` (AI summary), `/testers` (activity)
+- Tester profile page: `/projects/[id]/testers/[testerId]` — timeline, sessions, activity
+- Run detail page: `/projects/[id]/runs/[runId]` — logs, deployment preview, stage timeline, original feedback
+- Dashboard API routes:
+  - `/api/feedback/[projectId]` (list), `/[sessionId]` (detail/update), `/classify` (AI via Claude Haiku), `/digest` (AI summary)
+  - `/api/feedback/[projectId]/testers` (list), `/testers/[testerId]` (profile + timeline)
+  - `/api/runs/[projectId]` (list with feedback source enrichment), `/[runId]/logs`, `/[runId]/deployment`
+  - `/api/agent/[projectId]/health`, `/api/webhook/[projectId]`, `/api/github-app/webhook`, `/api/github-app/install`
 - Supabase tables: `feedback_sessions`, `feedback_messages`, `feedback_themes` (public schema, RLS enabled)
 - Widget persistence: `createFeedbackHandler` accepts optional `supabase` config for fire-and-forget conversation storage
 - Dashboard uses `@ai-sdk/anthropic` + `ai` (v6) + `zod` for AI classification/digest
@@ -459,7 +465,7 @@ Add this section to the consumer project's CLAUDE.md:
 - **Project ref:** `lilcfbtohnhegxmpcfpb`
 - **URL:** https://lilcfbtohnhegxmpcfpb.supabase.co
 - **Schema:** `feedback_chat` (agent queries with `{ db: { schema: 'feedback_chat' } }`)
-- **Tables:** `projects`, `job_queue`, `credentials`, `system_credentials`, `github_app_installations`, `feedback_sessions`, `feedback_messages`, `feedback_themes`, `pipeline_runs`
+- **Tables:** `projects`, `job_queue`, `credentials`, `system_credentials`, `api_keys`, `run_logs`, `feedback_sessions`, `feedback_messages`, `feedback_themes`, `pipeline_runs`
 - **`system_credentials`:** persists agent OAuth tokens across container restarts (key: `system_claude_oauth`)
 - **Migrations:** `packages/dashboard/supabase/migrations/`
 
@@ -487,6 +493,7 @@ Add this section to the consumer project's CLAUDE.md:
 - **Deploy:** `cd packages/agent && railway up --detach`
 - **Start command:** `npm start` runs `managed-worker.js` (not `server.js` — that's the legacy Fastify server)
 - **Linked locally:** `packages/agent/` is linked to this Railway project via `railway` CLI
+- **Job retry:** stale jobs (stuck in `processing` >30min) are reaped — retried up to 3 attempts with exponential backoff, or marked `failed` if exhausted. OAuth errors (`authentication_error`, `invalid_grant`, 401) are permanent failures (no retry). Columns: `job_queue.attempt_count`, `job_queue.last_error`
 
 ### GitHub Repo
 
