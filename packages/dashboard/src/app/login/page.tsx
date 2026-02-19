@@ -75,7 +75,7 @@ function LoginPage() {
           <button
             onClick={() => handleOAuth('google')}
             disabled={loading !== null}
-            className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-bg transition-colors hover:bg-white/90 disabled:opacity-50"
+            className="btn-primary flex w-full items-center justify-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-medium"
           >
             {loading === 'google' ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -93,7 +93,7 @@ function LoginPage() {
           <button
             onClick={() => handleOAuth('github')}
             disabled={loading !== null}
-            className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-edge bg-surface px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-surface-hover disabled:opacity-50"
+            className="btn flex w-full items-center justify-center gap-2.5 rounded-xl border border-edge bg-surface px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-surface-hover disabled:opacity-50"
           >
             {loading === 'github' ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -148,7 +148,7 @@ function LoginPage() {
           <button
             type="submit"
             disabled={loading !== null || !email || !password}
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-edge bg-surface text-sm text-fg transition-all hover:border-edge-hover hover:bg-surface-hover disabled:opacity-50"
+            className="btn flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-edge bg-surface text-sm text-fg transition-all hover:border-edge-hover hover:bg-surface-hover disabled:opacity-50"
           >
             {loading === 'email' ? (
               <Loader2 className="h-4 w-4 animate-spin" />

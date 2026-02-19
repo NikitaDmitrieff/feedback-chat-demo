@@ -16,7 +16,7 @@ export default async function ProjectsPage() {
         <h1 className="text-lg font-medium text-fg">Projects</h1>
         <Link
           href="/projects/new"
-          className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-medium text-bg transition-colors hover:bg-white/90"
+          className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
         >
           <Plus className="h-3.5 w-3.5" />
           New Project

@@ -120,7 +120,7 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
           </p>
           <button
             onClick={handleConnect}
-            className="mt-5 flex h-10 items-center gap-2 rounded-xl bg-white px-6 text-sm font-medium text-bg transition-colors hover:bg-white/90"
+            className="btn-primary mt-5 flex h-10 items-center gap-2 rounded-xl px-6 text-sm font-medium"
           >
             <Github className="h-4 w-4" />
             Connect GitHub
@@ -145,7 +145,7 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
           <button
             onClick={handleSetup}
             disabled={isPending}
-            className="flex h-10 items-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-bg transition-colors hover:bg-white/90 disabled:opacity-50"
+            className="btn-primary flex h-10 items-center gap-2 rounded-xl px-5 text-sm font-medium"
           >
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
             Set up my repo
@@ -211,7 +211,7 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
                     href={prUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex h-9 items-center gap-2 rounded-xl bg-white px-4 text-sm font-medium text-bg transition-colors hover:bg-white/90"
+                    className="btn-primary inline-flex h-9 items-center gap-2 rounded-xl px-4 text-sm font-medium"
                   >
                     <Github className="h-3.5 w-3.5" />
                     View PR
@@ -267,7 +267,7 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
           <button
             onClick={handleRetry}
             disabled={isPending}
-            className="flex h-10 items-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-bg transition-colors hover:bg-white/90 disabled:opacity-50"
+            className="btn-primary flex h-10 items-center gap-2 rounded-xl px-5 text-sm font-medium"
           >
             <Zap className="h-4 w-4" />
             Retry

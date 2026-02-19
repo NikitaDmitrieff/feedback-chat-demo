@@ -2,8 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { generateApiKey } from '@/lib/api-keys'
 import crypto from 'node:crypto'
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { SubmitButton } from './submit-button'
 
 export default function NewProjectPage() {
   async function createProject(formData: FormData) {
@@ -35,14 +34,6 @@ export default function NewProjectPage() {
 
   return (
     <div className="mx-auto max-w-lg px-6 pt-10 pb-16">
-      <Link
-        href="/projects"
-        className="mb-6 inline-flex items-center gap-1.5 text-xs text-muted transition-colors hover:text-fg"
-      >
-        <ArrowLeft className="h-3 w-3" />
-        Back to projects
-      </Link>
-
       <div className="glass-card p-6">
         <h1 className="mb-6 text-base font-medium text-fg">New Project</h1>
 
@@ -57,12 +48,7 @@ export default function NewProjectPage() {
             />
           </div>
 
-          <button
-            type="submit"
-            className="flex h-10 w-full items-center justify-center rounded-xl bg-white text-sm font-medium text-bg transition-colors hover:bg-white/90"
-          >
-            Create Project
-          </button>
+          <SubmitButton />
         </form>
       </div>
     </div>

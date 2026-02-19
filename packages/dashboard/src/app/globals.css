@@ -128,6 +128,29 @@ select.input-field {
 .stage-failed     { background: rgba(239,68,68,0.10); color: #ef4444; }
 .stage-rejected   { background: rgba(239,68,68,0.08); color: #ef4444; }
 
+/* ── Buttons ── */
+.btn {
+  transition: all 0.15s ease;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.btn-primary {
+  transition: all 0.15s ease;
+  background: white;
+  color: var(--color-bg);
+}
+.btn-primary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+}
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+  background: rgba(255, 255, 255, 0.8);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+}
+
 /* ── Skeleton shimmer ── */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
