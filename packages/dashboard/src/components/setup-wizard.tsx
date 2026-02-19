@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useTransition } from 'react'
-import { Github, Loader2, Check, ExternalLink, AlertCircle, Zap } from 'lucide-react'
+import { Github, Loader2, Check, ExternalLink, AlertCircle, Zap, Copy, CheckCheck } from 'lucide-react'
 import { sileo } from 'sileo'
 import { createClient } from '@/lib/supabase/client'
 import { triggerSetup, resetSetupStatus } from '@/app/projects/[id]/actions'
@@ -23,7 +23,33 @@ const STAGES: { key: SetupStatus; label: string }[] = [
   { key: 'committing', label: 'Creating pull request' },
 ]
 
-const ACTIVE_STATUSES: SetupStatus[] = ['queued', 'cloning', 'generating', 'committing']
+const POLL_STATUSES: SetupStatus[] = ['queued', 'cloning', 'generating', 'committing', 'pr_created']
+
+const ENV_SNIPPET = `ANTHROPIC_API_KEY=\nFEEDBACK_PASSWORD=easy`
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }, [text])
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="rounded-md p-1 text-muted transition-colors hover:bg-white/10 hover:text-fg"
+      title="Copy to clipboard"
+    >
+      {copied ? (
+        <CheckCheck className="h-3.5 w-3.5 text-success" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" />
+      )}
+    </button>
+  )
+}
 
 export function SetupWizard({ projectId, githubRepo, installationId, initialStatus, initialPrUrl, initialError }: Props) {
   const [status, setStatus] = useState<SetupStatus>(initialStatus)
@@ -31,9 +57,10 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
   const [error, setError] = useState<string | null>(initialError)
   const [isPending, startTransition] = useTransition()
 
-  // Poll for status updates during active setup
+  // Poll for status updates during active setup + until PR URL is available
   useEffect(() => {
-    if (!ACTIVE_STATUSES.includes(status)) return
+    const shouldPoll = POLL_STATUSES.includes(status) && !(status === 'pr_created' && prUrl)
+    if (!shouldPoll) return
 
     const supabase = createClient()
     const interval = setInterval(async () => {
@@ -51,7 +78,7 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [status, projectId])
+  }, [status, prUrl, projectId])
 
   const handleConnect = useCallback(() => {
     window.location.href = `/api/github-app/install?projectId=${projectId}`
@@ -129,7 +156,7 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
   }
 
   // --- Setting up (live progress) ---
-  if (ACTIVE_STATUSES.includes(status)) {
+  if (POLL_STATUSES.includes(status) && status !== 'pr_created') {
     const activeIndex = STAGES.findIndex(s => s.key === status)
     return (
       <div className="mb-8">
@@ -175,23 +202,44 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
           </div>
           {status !== 'complete' && (
             <>
-              <p className="text-xs text-muted mb-3">
+              <p className="text-xs text-muted mb-4">
                 Merge the PR to activate the widget.
               </p>
-              {prUrl && (
-                <a
-                  href={prUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-bg transition-colors hover:bg-white/90"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  View Pull Request
-                </a>
-              )}
-              <div className="mt-4 rounded-lg bg-white/[0.04] p-3">
-                <p className="text-xs font-medium text-fg mb-2">After merging, add to <code className="text-fg">.env.local</code>:</p>
-                <pre className="select-all rounded-md bg-black/30 px-3 py-2 text-xs text-fg/80 leading-relaxed"><code>{`ANTHROPIC_API_KEY=\nFEEDBACK_PASSWORD=easy`}</code></pre>
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                {prUrl ? (
+                  <a
+                    href={prUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex h-9 items-center gap-2 rounded-xl bg-white px-4 text-sm font-medium text-bg transition-colors hover:bg-white/90"
+                  >
+                    <Github className="h-3.5 w-3.5" />
+                    View PR
+                  </a>
+                ) : (
+                  <span className="inline-flex h-9 items-center gap-2 rounded-xl border border-edge px-4 text-xs text-muted">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Fetching PR link...
+                  </span>
+                )}
+                {prUrl && (
+                  <a
+                    href={`${prUrl}/checks`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex h-9 items-center gap-2 rounded-xl border border-edge bg-surface px-4 text-xs font-medium text-fg transition-colors hover:bg-surface-hover"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Vercel Preview
+                  </a>
+                )}
+              </div>
+              <div className="rounded-lg bg-white/[0.04] p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium text-fg">After merging, add to <code className="text-fg">.env.local</code>:</p>
+                  <CopyButton text={ENV_SNIPPET} />
+                </div>
+                <pre className="rounded-md bg-black/30 px-3 py-2 text-xs text-fg/80 leading-relaxed"><code>{ENV_SNIPPET}</code></pre>
                 <p className="mt-2 text-[11px] text-muted">Then restart your dev server.</p>
               </div>
             </>
