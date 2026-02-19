@@ -62,6 +62,7 @@ export type TesterSummary = {
   top_themes: { name: string; color: string; count: number }[]
   resolved_count: number
   total_count: number
+  runs_triggered: number
 }
 
 export type SetupStatus =
@@ -80,4 +81,43 @@ export type ProjectSetupInfo = {
   setup_status: SetupStatus
   setup_pr_url: string | null
   setup_error: string | null
+}
+
+export type FeedbackSource = {
+  session_id: string
+  tester_name: string | null
+  ai_summary: string | null
+  ai_themes: string[] | null
+}
+
+export type EnrichedPipelineRun = PipelineRun & {
+  feedback_source: FeedbackSource | null
+}
+
+export type TimelineEvent = {
+  id: string
+  type: 'conversation_started' | 'issue_created' | 'run_triggered' | 'run_completed' | 'feedback_resolved'
+  timestamp: string
+  session_id?: string
+  ai_summary?: string | null
+  message_preview?: string
+  github_issue_number?: number
+  issue_title?: string
+  run_id?: string
+  stage?: string
+  result?: string | null
+  github_pr_number?: number | null
+}
+
+export type TesterProfile = {
+  tester_id: string
+  tester_name: string | null
+  first_seen: string
+  last_active: string
+  session_count: number
+  resolved_count: number
+  runs_triggered: number
+  top_themes: { name: string; color: string; count: number }[]
+  timeline: TimelineEvent[]
+  sessions: FeedbackSession[]
 }
