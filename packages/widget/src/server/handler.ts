@@ -42,7 +42,8 @@ function extractTextContent(message: UIMessage): string {
 
 async function persistFeedback(
   supabaseConfig: NonNullable<FeedbackHandlerConfig['supabase']>,
-  messages: UIMessage[]
+  messages: UIMessage[],
+  testerName?: string
 ) {
   const { createClient } = await import('@supabase/supabase-js')
   const supabase = createClient(
@@ -51,8 +52,8 @@ async function persistFeedback(
     { db: { schema: 'feedback_chat' } }
   )
 
-  const testerName = 'Anonymous'
-  const testerId = 'anonymous'
+  const name = testerName || 'Anonymous'
+  const testerId = testerName ? testerName.toLowerCase().replace(/\s+/g, '-') : 'anonymous'
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
   const { data: existing } = await supabase
@@ -77,7 +78,7 @@ async function persistFeedback(
       .insert({
         project_id: supabaseConfig.projectId,
         tester_id: testerId,
-        tester_name: testerName,
+        tester_name: name,
       })
       .select('id')
       .single()
@@ -111,7 +112,7 @@ async function persistFeedback(
  */
 export function createFeedbackHandler(config: FeedbackHandlerConfig) {
   const POST = async (req: Request): Promise<Response> => {
-    const { messages, password }: { messages: UIMessage[]; password: string } =
+    const { messages, password, testerName }: { messages: UIMessage[]; password: string; testerName?: string } =
       await req.json()
 
     if (password !== config.password) {
@@ -174,7 +175,7 @@ export function createFeedbackHandler(config: FeedbackHandlerConfig) {
     })
 
     if (config.supabase) {
-      persistFeedback(config.supabase, messages).catch(() => {})
+      persistFeedback(config.supabase, messages, testerName).catch(() => {})
     }
 
     return result.toUIMessageStreamResponse()
