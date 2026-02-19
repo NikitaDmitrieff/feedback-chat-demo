@@ -34,13 +34,22 @@ function updateStatus(supabase: AnySupabaseClient, projectId: string, status: st
 }
 
 function run(cmd: string, args: string[], cwd: string, env?: Record<string, string | undefined>): string {
-  return execFileSync(cmd, args, {
-    cwd,
-    env: env ?? process.env, // env is already built from process.env — don't re-merge or deleted keys leak back
-    encoding: 'utf-8',
-    timeout: 300_000,
-    maxBuffer: 10 * 1024 * 1024,
-  })
+  try {
+    return execFileSync(cmd, args, {
+      cwd,
+      env: env ?? process.env, // env is already built from process.env — don't re-merge or deleted keys leak back
+      encoding: 'utf-8',
+      timeout: 300_000,
+      maxBuffer: 10 * 1024 * 1024,
+    })
+  } catch (err: unknown) {
+    const e = err as { stderr?: string; stdout?: string; status?: number }
+    const stderr = (e.stderr || '').slice(-2000)
+    const stdout = (e.stdout || '').slice(-2000)
+    throw new Error(
+      `${cmd} ${args[0] ?? ''} failed (exit ${e.status ?? '?'}):\n${stderr || stdout || 'no output'}`
+    )
+  }
 }
 
 export async function runSetupJob(input: SetupJobInput): Promise<void> {
@@ -78,7 +87,7 @@ export async function runSetupJob(input: SetupJobInput): Promise<void> {
       if (cred.type === 'claude_oauth') {
         // Project-level OAuth: write it, refresh if needed, extract access token
         process.env.CLAUDE_CREDENTIALS_JSON = cred.encrypted_value
-        initCredentials()
+        await initCredentials()
         await ensureValidToken()
         if (existsSync(credsPath)) {
           const credsData = JSON.parse(readFileSync(credsPath, 'utf-8'))
@@ -90,6 +99,7 @@ export async function runSetupJob(input: SetupJobInput): Promise<void> {
       }
     } else {
       // No project credential — use the system credential written at worker startup
+      await ensureValidToken() // refresh if expired
       if (existsSync(credsPath)) {
         const credsData = JSON.parse(readFileSync(credsPath, 'utf-8'))
         claudeEnv.CLAUDE_CODE_OAUTH_TOKEN = credsData?.claudeAiOauth?.accessToken
@@ -146,15 +156,13 @@ export async function runSetupJob(input: SetupJobInput): Promise<void> {
       }),
     })
 
-    if (!prResponse.ok) {
-      const text = await prResponse.text()
-      // 422 = PR already exists (branch already has a PR)
-      if (prResponse.status !== 422) {
-        throw new Error(`Failed to create PR: ${prResponse.status} ${text}`)
-      }
+    const prData = await prResponse.json()
+
+    if (!prResponse.ok && prResponse.status !== 422) {
+      // 422 = PR already exists (branch already has a PR) — that's fine
+      throw new Error(`Failed to create PR: ${prResponse.status} ${JSON.stringify(prData)}`)
     }
 
-    const prData = await prResponse.json()
     const prUrl = prData.html_url ?? null
 
     // 5. Create labels (idempotent)

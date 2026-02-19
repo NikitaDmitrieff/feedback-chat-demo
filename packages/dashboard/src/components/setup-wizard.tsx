@@ -98,10 +98,17 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
 
   const handleRetry = useCallback(() => {
     startTransition(async () => {
+      // Reset status first, then immediately trigger a new setup job
       await resetSetupStatus(projectId)
-      setStatus('installing')
       setError(null)
       setPrUrl(null)
+      const result = await triggerSetup(projectId)
+      if (result.error) {
+        sileo.error({ title: result.error })
+        setStatus('installing')
+        return
+      }
+      setStatus('queued')
     })
   }, [projectId])
 
@@ -263,7 +270,7 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
             <AlertCircle className="h-5 w-5 text-danger" />
             <h2 className="text-sm font-medium text-fg">Setup failed</h2>
           </div>
-          <p className="text-xs text-muted mb-3">{error ?? 'An unknown error occurred.'}</p>
+          <p className="text-xs text-muted mb-3 line-clamp-3">{error ?? 'An unknown error occurred.'}</p>
           <button
             onClick={handleRetry}
             disabled={isPending}

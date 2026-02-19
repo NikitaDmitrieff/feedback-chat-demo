@@ -381,7 +381,7 @@ export async function runManagedJob(input: ManagedJobInput): Promise<void> {
 
   if (input.claudeCredentials) {
     process.env.CLAUDE_CREDENTIALS_JSON = input.claudeCredentials
-    initCredentials()
+    await initCredentials()
   } else if (input.anthropicApiKey) {
     process.env.ANTHROPIC_API_KEY = input.anthropicApiKey
     delete process.env.CLAUDE_CREDENTIALS_JSON

@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/server.js",
-    "start:managed": "node dist/managed-worker.js",
+    "start": "node dist/managed-worker.js",
+    "start:legacy": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "credentials": "tsx src/credentials.ts",
     "test": "vitest run",

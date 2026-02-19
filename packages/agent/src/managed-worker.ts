@@ -156,8 +156,8 @@ async function main() {
   const supabase = createSupabaseClient()
   console.log(`[${WORKER_ID}] Starting managed worker, polling every ${POLL_INTERVAL_MS}ms`)
 
-  // Initialize system Claude credential at startup and ensure it's fresh
-  if (initCredentials()) {
+  // Initialize system Claude credential at startup (reads from Supabase first, then env var)
+  if (await initCredentials()) {
     await ensureValidToken()
   }
 
@@ -165,6 +165,8 @@ async function main() {
     const job = await pollForJobs(supabase)
 
     if (job) {
+      // Refresh OAuth token before each job — access tokens expire after ~8h
+      await ensureValidToken()
       await processJob(supabase, job)
     } else {
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))

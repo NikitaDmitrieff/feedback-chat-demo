@@ -441,6 +441,59 @@ Add this section to the consumer project's CLAUDE.md:
 - localStorage keys: `feedback_conversations`, `feedback_conv_{id}`, `feedback_active_conv`
 ```
 
+## Infrastructure
+
+### Vercel (Dashboard)
+
+- **Project:** `nikitas-projects-a6f0a03c/dashboard` (project ID: `prj_gVz3JOXhJZSYZRKFYq16ZvZlAlJM`)
+- **Production URL:** https://loop.joincoby.com
+- **Default Vercel URL:** https://feedback-chat-dashboard.vercel.app (do not use — custom domain is canonical)
+- **Root directory setting:** `packages/dashboard` — deploy from repo root or use `vercel redeploy`, NOT `vercel --prod` from `packages/dashboard/` (causes doubled path error)
+- **Domain:** `feedback.chat` registered, `loop.joincoby.com` is the active production alias
+- **Linked locally:** `packages/dashboard/.vercel/` — do NOT create a `.vercel/` at repo root (causes a duplicate project)
+- **Env vars (production):** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_URL`, `TURBO_DISABLED`, `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_PRIVATE_KEY`
+- **Auto-deploys** on push to `main` via Vercel Git integration
+
+### Supabase
+
+- **Project ref:** `lilcfbtohnhegxmpcfpb`
+- **URL:** https://lilcfbtohnhegxmpcfpb.supabase.co
+- **Schema:** `feedback_chat` (agent queries with `{ db: { schema: 'feedback_chat' } }`)
+- **Tables:** `projects`, `job_queue`, `credentials`, `system_credentials`, `github_app_installations`, `feedback_sessions`, `feedback_messages`, `feedback_themes`, `pipeline_runs`
+- **`system_credentials`:** persists agent OAuth tokens across container restarts (key: `system_claude_oauth`)
+- **Migrations:** `packages/dashboard/supabase/migrations/`
+
+### GitHub App
+
+- **Name:** looper-agent
+- **App ID:** 2891060
+- **Settings:** https://github.com/settings/apps/looper-agent
+- **Public page:** https://github.com/apps/looper-agent
+- **Setup URL (post-install redirect):** https://loop.joincoby.com/auth/github-app/setup
+- **Webhook endpoint:** https://loop.joincoby.com/api/github-app/webhook
+- **Private key:** stored in `packages/dashboard/.env.local` and `packages/agent/.env` as `GITHUB_APP_PRIVATE_KEY` (escaped `\n` format)
+- **Code:** `packages/dashboard/src/lib/github-app.ts` (shared App singleton), `packages/agent/src/github-app.ts`
+
+### Agent (Railway)
+
+- **Railway project:** `postbac-agent` (ID: `ab0d7182-01e7-4f14-83c4-898ebdd9edfd`)
+- **Service:** `postbac-agent` (ID: `ffbb52ca-c5e6-4fbf-9e39-d9241fa2f357`)
+- **Public domain:** `postbac-agent-production.up.railway.app`
+- **Source:** `packages/agent/`
+- **Dockerfile:** multi-stage build, CMD is `managed-worker.js` (polls Supabase `job_queue`)
+- **Auth:** OAuth only (`CLAUDE_CREDENTIALS_JSON`) — no `ANTHROPIC_API_KEY`
+- **OAuth auto-refresh:** tokens are refreshed before each job and persisted to Supabase `system_credentials` table. On container restart, the agent reads from Supabase (not the env var). You should only need to run `npm run credentials` once to seed the initial token.
+- **Env vars:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `CLAUDE_CREDENTIALS_JSON`
+- **Deploy:** `cd packages/agent && railway up --detach`
+- **Start command:** `npm start` runs `managed-worker.js` (not `server.js` — that's the legacy Fastify server)
+- **Linked locally:** `packages/agent/` is linked to this Railway project via `railway` CLI
+
+### GitHub Repo
+
+- **URL:** https://github.com/NikitaDmitrieff/feedback-chat
+- **Main branch:** `main`
+- **npm package:** `@nikitadmitrieff/feedback-chat` (published from `packages/widget/`)
+
 ## Gotchas
 
 - `react@19.1.0` and `19.1.1` are excluded by `@ai-sdk/react` — consumer needs `>=19.1.2`. **Check before installing.**
@@ -454,7 +507,8 @@ Add this section to the consumer project's CLAUDE.md:
 - The agent Dockerfile uses a multi-stage build — `dist/` is NOT expected pre-built, it compiles in the builder stage. The CMD is `managed-worker.js` (polls Supabase job_queue), NOT `server.js` (standalone Fastify)
 - The agent runs as a non-root `agent` user — Claude Code CLI refuses `--dangerously-skip-permissions` as root
 - The agent uses `CLAUDE_CODE_OAUTH_TOKEN` env var (not credentials file) to authenticate the CLI in headless Docker. This requires `~/.claude.json` with `{"hasCompletedOnboarding": true}` (see [anthropics/claude-code#8938](https://github.com/anthropics/claude-code/issues/8938))
-- Claude Max OAuth tokens expire — if the agent fails with `authentication_error` or `invalid_grant`, run `cd packages/agent && npm run credentials` to extract fresh tokens and update the deployment
+- Claude Max OAuth tokens expire — the agent auto-refreshes and persists to Supabase `system_credentials`. If it still fails with `authentication_error`, run `cd packages/agent && npm run credentials` (may require `claude login` first), then `railway variables set CLAUDE_CREDENTIALS_JSON='...'`
+- The agent's `package.json` `start` script MUST point to `managed-worker.js`, not `server.js` — Railway/Nixpacks runs `npm start` and ignores the Dockerfile CMD
 - Vercel team SSO protection blocks `*.vercel.app` webhook URLs with 401 — use a custom domain to bypass it
 - The webhook handler accepts `labeled` events (when `auto-implement` is added), so users can re-trigger by toggling the label — not just `opened`/`reopened`
 - When creating GitHub webhooks via `gh api`, you MUST use `config[content_type]=json` — the default is `form-urlencoded` which the Fastify agent rejects with 415
