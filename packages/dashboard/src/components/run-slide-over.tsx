@@ -3,12 +3,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { X, ExternalLink, GitPullRequest, AlertCircle, Globe } from 'lucide-react'
 import { StageBadge } from './stage-badge'
-import type { PipelineRun, DeploymentInfo } from '@/lib/types'
+import type { EnrichedPipelineRun, DeploymentInfo } from '@/lib/types'
 
 const STAGE_ORDER = ['created', 'queued', 'running', 'validating', 'preview_ready', 'deployed']
 
 type Props = {
-  run: PipelineRun
+  run: EnrichedPipelineRun
   githubRepo: string
   projectId: string
   onClose: () => void
@@ -70,6 +70,27 @@ export function RunSlideOver({ run, githubRepo, projectId, onClose }: Props) {
             <p className="mb-5 text-xs text-muted">
               Triggered by <span className="text-fg">{run.triggered_by}</span>
             </p>
+          )}
+
+          {/* Original Feedback */}
+          {run.feedback_source && (
+            <div className="mb-5">
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted">Original Feedback</h3>
+              <div className="rounded-lg bg-surface px-3 py-2.5">
+                <p className="text-sm font-medium text-fg">
+                  {run.feedback_source.tester_name || 'Anonymous'}
+                </p>
+                {run.feedback_source.ai_summary && (
+                  <p className="mt-1 text-xs text-muted line-clamp-3">{run.feedback_source.ai_summary}</p>
+                )}
+                <a
+                  href={`/projects/${projectId}/feedback`}
+                  className="mt-2 inline-flex text-xs text-accent hover:underline"
+                >
+                  View full conversation
+                </a>
+              </div>
+            </div>
           )}
 
           {/* Stage timeline */}

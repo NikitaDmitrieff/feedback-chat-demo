@@ -33,6 +33,18 @@ export default async function RunDetailPage({
 
   if (!run) notFound()
 
+  let feedbackSource: { tester_name: string | null; ai_summary: string | null } | null = null
+  if (run.github_issue_number) {
+    const { data: session } = await supabase
+      .from('feedback_sessions')
+      .select('tester_name, ai_summary')
+      .eq('project_id', projectId)
+      .eq('github_issue_number', run.github_issue_number)
+      .limit(1)
+      .single()
+    feedbackSource = session ?? null
+  }
+
   const currentStageIndex = STAGE_ORDER.indexOf(run.stage)
   const isFailed = run.stage === 'failed' || run.stage === 'rejected'
 
@@ -165,6 +177,25 @@ export default async function RunDetailPage({
               </a>
             )}
           </div>
+
+          {/* Original Feedback */}
+          {feedbackSource && (
+            <div className="glass-card p-5">
+              <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted">Original Feedback</h3>
+              <p className="text-sm font-medium text-fg">
+                {feedbackSource.tester_name || 'Anonymous'}
+              </p>
+              {feedbackSource.ai_summary && (
+                <p className="mt-1.5 text-xs text-muted leading-relaxed">{feedbackSource.ai_summary}</p>
+              )}
+              <a
+                href={`/projects/${projectId}/feedback`}
+                className="mt-2 inline-flex text-xs text-accent hover:underline"
+              >
+                View conversation
+              </a>
+            </div>
+          )}
 
           {/* Metadata */}
           <div className="glass-card p-5">
