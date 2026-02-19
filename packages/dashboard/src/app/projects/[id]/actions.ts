@@ -55,13 +55,15 @@ export async function triggerSetup(projectId: string) {
     return { error: 'Setup already in progress' }
   }
 
-  // Create setup job
+  // Create setup job (github_issue_number/issue_body not applicable for setup jobs)
   const { error: jobError } = await supabase
     .from('job_queue')
     .insert({
       project_id: projectId,
       job_type: 'setup',
+      github_issue_number: 0,
       issue_title: `Setup: ${project.github_repo}`,
+      issue_body: '',
     })
 
   if (jobError) return { error: 'Failed to create setup job' }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useTransition } from 'react'
-import { Github, Loader2, Check, ExternalLink, AlertCircle, Zap, ChevronDown } from 'lucide-react'
+import { Github, Loader2, Check, ExternalLink, AlertCircle, Zap } from 'lucide-react'
 import { sileo } from 'sileo'
 import { createClient } from '@/lib/supabase/client'
 import { triggerSetup, resetSetupStatus } from '@/app/projects/[id]/actions'
@@ -29,7 +29,6 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
   const [status, setStatus] = useState<SetupStatus>(initialStatus)
   const [prUrl, setPrUrl] = useState<string | null>(initialPrUrl)
   const [error, setError] = useState<string | null>(initialError)
-  const [showManual, setShowManual] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   // Poll for status updates during active setup
@@ -98,13 +97,6 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
           >
             <Github className="h-4 w-4" />
             Connect GitHub
-          </button>
-          <button
-            onClick={() => setShowManual(!showManual)}
-            className="mt-3 flex items-center gap-1 text-xs text-muted hover:text-fg transition-colors"
-          >
-            <ChevronDown className={`h-3 w-3 transition-transform ${showManual ? 'rotate-180' : ''}`} />
-            Manual setup
           </button>
         </div>
       </div>

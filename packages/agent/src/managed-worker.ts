@@ -1,7 +1,7 @@
 import { createSupabaseClient } from './supabase.js'
 import { runManagedJob } from './worker.js'
 import { runSetupJob } from './setup-worker.js'
-import { getInstallationToken, isGitHubAppConfigured } from './github-app.js'
+import { getInstallationToken, getInstallationFirstRepo, isGitHubAppConfigured } from './github-app.js'
 import { initCredentials, ensureValidToken } from './oauth.js'
 type Supabase = ReturnType<typeof createSupabaseClient>
 
@@ -11,6 +11,7 @@ const WORKER_ID = `worker-${process.pid}-${Date.now()}`
 async function pollForJobs(supabase: Supabase) {
   const { data: job, error } = await supabase.rpc('claim_next_job', {
     p_worker_id: WORKER_ID,
+    p_skip_setup: false,
   })
 
   if (error || !job) return null
@@ -100,10 +101,23 @@ async function processJob(supabase: Supabase, job: {
         throw new Error('Setup job requires github_installation_id on the project')
       }
 
+      // Auto-detect github_repo if missing
+      let githubRepo = project.github_repo
+      if (!githubRepo) {
+        console.log(`[${WORKER_ID}] github_repo missing, auto-detecting from installation ${project.github_installation_id}...`)
+        githubRepo = await getInstallationFirstRepo(project.github_installation_id) ?? ''
+        if (githubRepo) {
+          await supabase.from('projects').update({ github_repo: githubRepo }).eq('id', job.project_id)
+          console.log(`[${WORKER_ID}] Auto-detected repo: ${githubRepo}`)
+        } else {
+          throw new Error('Could not detect GitHub repo from installation. Please reconnect the GitHub App.')
+        }
+      }
+
       await runSetupJob({
         jobId: job.id,
         projectId: job.project_id,
-        githubRepo: project.github_repo,
+        githubRepo,
         installationId: project.github_installation_id,
         supabase,
       })

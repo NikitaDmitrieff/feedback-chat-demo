@@ -25,6 +25,14 @@ export async function getInstallationToken(installationId: number): Promise<stri
   return token
 }
 
+/** Get the first repo accessible to an installation (used when github_repo is missing). */
+export async function getInstallationFirstRepo(installationId: number): Promise<string | null> {
+  const app = getApp()
+  const octokit = await app.getInstallationOctokit(installationId)
+  const { data } = await octokit.request('GET /installation/repositories', { per_page: 1 })
+  return data.repositories[0]?.full_name ?? null
+}
+
 /** Check if GitHub App credentials are configured. */
 export function isGitHubAppConfigured(): boolean {
   return !!(process.env.GITHUB_APP_ID && process.env.GITHUB_APP_PRIVATE_KEY)

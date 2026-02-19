@@ -1,23 +1,29 @@
-create or replace function claim_next_job(p_worker_id text)
-returns json as $$
-declare
-  claimed job_queue%rowtype;
-begin
-  select * into claimed
-  from job_queue
-  where status = 'pending'
-  order by created_at
-  limit 1
-  for update skip locked;
+-- p_skip_setup defaults to TRUE: old production workers skip setup jobs automatically.
+-- New workers pass p_skip_setup => false to claim all job types.
+CREATE OR REPLACE FUNCTION feedback_chat.claim_next_job(
+  p_worker_id text,
+  p_skip_setup boolean DEFAULT true
+)
+RETURNS json AS $$
+DECLARE
+  claimed feedback_chat.job_queue%rowtype;
+BEGIN
+  SELECT * INTO claimed
+  FROM feedback_chat.job_queue
+  WHERE status = 'pending'
+    AND (NOT p_skip_setup OR job_type != 'setup')
+  ORDER BY created_at
+  LIMIT 1
+  FOR UPDATE SKIP LOCKED;
 
-  if claimed.id is null then
-    return null;
-  end if;
+  IF claimed.id IS NULL THEN
+    RETURN NULL;
+  END IF;
 
-  update job_queue
-  set status = 'processing', worker_id = p_worker_id, locked_at = now()
-  where id = claimed.id;
+  UPDATE feedback_chat.job_queue
+  SET status = 'processing', worker_id = p_worker_id, locked_at = now()
+  WHERE id = claimed.id;
 
-  return row_to_json(claimed);
-end;
-$$ language plpgsql;
+  RETURN row_to_json(claimed);
+END;
+$$ LANGUAGE plpgsql;

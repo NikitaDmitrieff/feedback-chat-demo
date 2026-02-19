@@ -60,7 +60,8 @@ async function claudeEnv(): Promise<NodeJS.ProcessEnv> {
     const ok = await ensureValidToken()
     if (!ok) {
       console.warn('[claude] OAuth refresh failed, falling back to process.env')
-      return { ...process.env, CI: 'true' }
+      const { CLAUDECODE: _cc, ...envWithoutClaude } = process.env
+      return { ...envWithoutClaude, CI: 'true' }
     }
     try {
       const credsPath = join(homedir(), '.claude', '.credentials.json')
@@ -68,11 +69,13 @@ async function claudeEnv(): Promise<NodeJS.ProcessEnv> {
       const accessToken = creds?.claudeAiOauth?.accessToken
       if (accessToken) {
         const { ANTHROPIC_API_KEY: _, ...rest } = process.env
-        return { ...rest, CLAUDE_CODE_OAUTH_TOKEN: accessToken, CI: 'true' }
+          const { CLAUDECODE: _cc, ...rest2 } = rest
+        return { ...rest2, CLAUDE_CODE_OAUTH_TOKEN: accessToken, CI: 'true' }
       }
     } catch {}
   }
-  return { ...process.env, CI: 'true' }
+  const { CLAUDECODE: _cc, ...envWithoutClaude } = process.env
+  return { ...envWithoutClaude, CI: 'true' }
 }
 
 async function runClaude(prompt: string, workDir: string, issueNumber: number, timeoutMs: number): Promise<void> {

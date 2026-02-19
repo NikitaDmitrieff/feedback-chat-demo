@@ -36,7 +36,7 @@ function updateStatus(supabase: AnySupabaseClient, projectId: string, status: st
 function run(cmd: string, args: string[], cwd: string, env?: Record<string, string | undefined>): string {
   return execFileSync(cmd, args, {
     cwd,
-    env: env ? { ...process.env, ...env } : process.env,
+    env: env ?? process.env, // env is already built from process.env — don't re-merge or deleted keys leak back
     encoding: 'utf-8',
     timeout: 300_000,
     maxBuffer: 10 * 1024 * 1024,
@@ -100,6 +100,7 @@ export async function runSetupJob(input: SetupJobInput): Promise<void> {
     }
 
     claudeEnv.CI = 'true'
+    delete claudeEnv.CLAUDECODE // prevent "nested session" error when worker runs inside Claude Code
 
     const setupPrompt = buildSetupPrompt(githubRepo)
     run('claude', ['--dangerously-skip-permissions', '-p', setupPrompt], workDir, claudeEnv)
@@ -189,12 +190,30 @@ function buildSetupPrompt(githubRepo: string): string {
 Do the following steps in order:
 
 1. Check if this is a Next.js project. Find the app directory (usually app/ or src/app/).
-2. Install the package and peer dependencies:
+
+2. Install the widget and peer dependencies:
    npm install @nikitadmitrieff/feedback-chat @assistant-ui/react @assistant-ui/react-ai-sdk @assistant-ui/react-markdown ai @ai-sdk/anthropic
-3. Find the main CSS file (usually globals.css or app/globals.css).
-   - If using Tailwind v4 (has @import "tailwindcss"), add AFTER that import:
-     @source "../node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js";
-   - If using Tailwind v3, add the path to the content array in tailwind.config.
+
+3. Ensure Tailwind CSS is set up — the widget REQUIRES it for all layout and styling.
+   Check if tailwindcss appears in package.json dependencies/devDependencies.
+
+   If Tailwind is NOT installed:
+     npm install tailwindcss @tailwindcss/postcss postcss
+     Create postcss.config.mjs:
+       const config = { plugins: { '@tailwindcss/postcss': {} } }
+       export default config
+     Find the main CSS file (globals.css). Replace its entire contents with:
+       @import "tailwindcss";
+       @source "../node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js";
+
+   If Tailwind v4 IS installed (CSS file has @import "tailwindcss"):
+     Add this line AFTER the @import "tailwindcss" line:
+       @source "../node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js";
+
+   If Tailwind v3 IS installed (has tailwind.config.js or tailwind.config.ts):
+     Add to the content array in tailwind.config:
+       "./node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js"
+
 4. Create the chat API route at {appDir}/api/feedback/chat/route.ts:
    import { createFeedbackHandler } from '@nikitadmitrieff/feedback-chat/server'
    const handler = createFeedbackHandler({
@@ -205,6 +224,7 @@ Do the following steps in order:
      },
    })
    export const POST = handler.POST
+
 5. Create the status API route at {appDir}/api/feedback/status/route.ts:
    import { createStatusHandler } from '@nikitadmitrieff/feedback-chat/server'
    const handler = createStatusHandler({
@@ -215,6 +235,7 @@ Do the following steps in order:
      },
    })
    export const { GET, POST } = handler
+
 6. Create a client component at components/FeedbackButton.tsx:
    'use client'
    import { useState } from 'react'
@@ -224,8 +245,10 @@ Do the following steps in order:
      const [open, setOpen] = useState(false)
      return <FeedbackPanel isOpen={open} onToggle={() => setOpen(!open)} />
    }
+
 7. Add <FeedbackButton /> to the root layout inside the <body> tag.
    Import it: import { FeedbackButton } from '@/components/FeedbackButton'
+
 8. Create a .env.local.example file listing the required env vars:
    ANTHROPIC_API_KEY=sk-ant-...
    FEEDBACK_PASSWORD=easy
@@ -236,7 +259,8 @@ IMPORTANT:
 - Do NOT install React — it is already a dependency.
 - Do NOT modify existing components beyond adding the FeedbackButton import to the layout.
 - Do NOT commit anything — just make the file changes.
-- If you cannot find the app directory, look for a next.config file to confirm it is a Next.js project.`
+- If you cannot find the app directory, look for a next.config file to confirm it is a Next.js project.
+- The widget will render completely unstyled without Tailwind — this step is mandatory even for projects that don't otherwise use Tailwind.`
 }
 
 function buildPrBody(githubRepo: string): string {

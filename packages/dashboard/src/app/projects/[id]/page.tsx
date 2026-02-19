@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { SetupWizard } from '@/components/setup-wizard'
+import { SetupSection } from '@/components/setup-section'
 import type { SetupStatus } from '@/lib/types'
 import { DigestCard } from '@/components/digest-card'
 import { StatsBar } from '@/components/stats-bar'
@@ -10,10 +10,13 @@ import { ArrowLeft, Github } from 'lucide-react'
 
 export default async function ProjectPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ apiKey?: string }>
 }) {
   const { id } = await params
+  const { apiKey } = await searchParams
   const supabase = await createClient()
 
   const { data: project } = await supabase
@@ -32,6 +35,9 @@ export default async function ProjectPage({
     .limit(50)
 
   const hasRuns = !!runs && runs.length > 0
+
+  const agentUrl = process.env.AGENT_URL ?? ''
+  const webhookUrl = agentUrl ? `${agentUrl}/webhook/github` : ''
 
   return (
     <div className="mx-auto max-w-5xl px-6 pt-10 pb-16">
@@ -64,13 +70,19 @@ export default async function ProjectPage({
       </div>
 
       {/* Setup */}
-      <SetupWizard
+      <SetupSection
         projectId={project.id}
         githubRepo={project.github_repo ?? ''}
         installationId={project.github_installation_id ?? null}
         initialStatus={(project.setup_status ?? 'pending') as SetupStatus}
         initialPrUrl={project.setup_pr_url ?? null}
         initialError={project.setup_error ?? null}
+        webhookSecret={project.webhook_secret ?? ''}
+        apiKey={apiKey}
+        webhookUrl={webhookUrl}
+        agentUrl={agentUrl}
+        setupProgress={(project.setup_progress ?? {}) as Record<string, boolean>}
+        hasRuns={hasRuns}
       />
 
       {/* Runs table */}

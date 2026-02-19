@@ -36,7 +36,9 @@ export async function getInstallationToken(installationId: number): Promise<stri
 
 /** Build the GitHub App installation URL. state carries the projectId. */
 export function getInstallUrl(state: string): string {
-  return `https://github.com/apps/feedback-chat-bot/installations/new?state=${encodeURIComponent(state)}`
+  const slug = process.env.GITHUB_APP_SLUG
+  if (!slug) throw new Error('GITHUB_APP_SLUG must be set')
+  return `https://github.com/apps/${slug}/installations/new?state=${encodeURIComponent(state)}`
 }
 
 /** Verify a GitHub webhook HMAC-SHA256 signature (timing-safe). */
