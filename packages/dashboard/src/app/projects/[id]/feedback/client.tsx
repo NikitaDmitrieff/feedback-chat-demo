@@ -77,10 +77,7 @@ export function FeedbackPageClient({ projectId, githubRepo, themes }: Props) {
           <Loader2 className="h-5 w-5 animate-spin" />
         </div>
       ) : (
-        <TesterActivity
-          testers={testers}
-          onSelectTester={() => setTab('feedback')}
-        />
+        <TesterActivity testers={testers} />
       )}
 
       {selectedSession && (
