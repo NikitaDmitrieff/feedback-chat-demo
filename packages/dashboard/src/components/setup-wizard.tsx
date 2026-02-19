@@ -173,20 +173,22 @@ export function SetupWizard({ projectId, githubRepo, installationId, initialStat
               {status === 'complete' ? 'Widget is live!' : 'PR ready!'}
             </h2>
           </div>
-          {prUrl && status !== 'complete' && (
+          {status !== 'complete' && (
             <>
               <p className="text-xs text-muted mb-3">
                 Merge the PR to activate the widget.
               </p>
-              <a
-                href={prUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-bg transition-colors hover:bg-white/90"
-              >
-                <ExternalLink className="h-4 w-4" />
-                View Pull Request
-              </a>
+              {prUrl && (
+                <a
+                  href={prUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-bg transition-colors hover:bg-white/90"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  View Pull Request
+                </a>
+              )}
               <div className="mt-4 rounded-lg bg-white/[0.04] p-3">
                 <p className="text-xs font-medium text-fg mb-2">After merging, add to <code className="text-fg">.env.local</code>:</p>
                 <pre className="select-all rounded-md bg-black/30 px-3 py-2 text-xs text-fg/80 leading-relaxed"><code>{`ANTHROPIC_API_KEY=\nFEEDBACK_PASSWORD=easy`}</code></pre>
