@@ -9,7 +9,7 @@ export async function GET(
   const { projectId } = await params
   const supabase = await createClient()
 
-  const [sessionsResult, themesResult] = await Promise.all([
+  const [sessionsResult, themesResult, runsResult] = await Promise.all([
     supabase
       .from('feedback_sessions')
       .select('*')
@@ -17,6 +17,10 @@ export async function GET(
     supabase
       .from('feedback_themes')
       .select('*')
+      .eq('project_id', projectId),
+    supabase
+      .from('pipeline_runs')
+      .select('github_issue_number')
       .eq('project_id', projectId),
   ])
 
@@ -30,6 +34,13 @@ export async function GET(
   const sessions = sessionsResult.data as FeedbackSession[]
   const themes = themesResult.data as FeedbackTheme[]
   const themeMap = new Map(themes.map(t => [t.id, t]))
+
+  const issueNumbersWithRuns = new Set<number>()
+  if (runsResult.data) {
+    for (const r of runsResult.data) {
+      issueNumbersWithRuns.add(r.github_issue_number)
+    }
+  }
 
   const grouped = new Map<string, FeedbackSession[]>()
   for (const session of sessions) {
@@ -69,6 +80,13 @@ export async function GET(
 
     const resolvedCount = testerSessions.filter(s => s.status === 'resolved').length
 
+    let runsTriggered = 0
+    for (const s of testerSessions) {
+      if (s.github_issue_number != null && issueNumbersWithRuns.has(s.github_issue_number)) {
+        runsTriggered++
+      }
+    }
+
     testers.push({
       tester_id: testerId,
       tester_name: testerSessions[0].tester_name,
@@ -77,6 +95,7 @@ export async function GET(
       top_themes: topThemes,
       resolved_count: resolvedCount,
       total_count: testerSessions.length,
+      runs_triggered: runsTriggered,
     })
   }
 
