@@ -34,6 +34,31 @@ export default async function ProjectPage({
     .order('started_at', { ascending: false })
     .limit(50)
 
+  const { data: feedbackSessions } = await supabase
+    .from('feedback_sessions')
+    .select('id, github_issue_number, tester_name, ai_summary, ai_themes')
+    .eq('project_id', id)
+    .not('github_issue_number', 'is', null)
+
+  const feedbackByIssue = new Map<number, { session_id: string; tester_name: string | null; ai_summary: string | null; ai_themes: string[] | null }>()
+  if (feedbackSessions) {
+    for (const s of feedbackSessions) {
+      if (s.github_issue_number != null) {
+        feedbackByIssue.set(s.github_issue_number, {
+          session_id: s.id,
+          tester_name: s.tester_name,
+          ai_summary: s.ai_summary,
+          ai_themes: s.ai_themes,
+        })
+      }
+    }
+  }
+
+  const enrichedRuns = (runs ?? []).map(run => ({
+    ...run,
+    feedback_source: feedbackByIssue.get(run.github_issue_number) ?? null,
+  }))
+
   const hasRuns = !!runs && runs.length > 0
 
   const agentUrl = process.env.AGENT_URL ?? ''
@@ -82,7 +107,7 @@ export default async function ProjectPage({
       {/* Runs table */}
       <div className="mb-8">
         <h2 className="mb-4 text-sm font-medium text-fg">Pipeline Runs</h2>
-        <RunsTable runs={runs ?? []} githubRepo={project.github_repo} projectId={project.id} />
+        <RunsTable runs={enrichedRuns} githubRepo={project.github_repo} projectId={project.id} />
       </div>
     </div>
   )

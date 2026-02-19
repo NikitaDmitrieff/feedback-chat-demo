@@ -1,19 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, MessageCircle } from 'lucide-react'
 import { StageBadge } from './stage-badge'
 import { RunSlideOver } from './run-slide-over'
-import type { PipelineRun } from '@/lib/types'
+import type { EnrichedPipelineRun } from '@/lib/types'
 
 type Props = {
-  runs: PipelineRun[]
+  runs: EnrichedPipelineRun[]
   githubRepo: string
   projectId: string
 }
 
 export function RunsTable({ runs, githubRepo, projectId }: Props) {
-  const [selectedRun, setSelectedRun] = useState<PipelineRun | null>(null)
+  const [selectedRun, setSelectedRun] = useState<EnrichedPipelineRun | null>(null)
 
   if (runs.length === 0) {
     return (
@@ -32,7 +32,7 @@ export function RunsTable({ runs, githubRepo, projectId }: Props) {
           <thead>
             <tr className="border-b border-edge text-xs text-muted">
               <th className="px-5 py-3 font-medium">Issue</th>
-              <th className="px-5 py-3 font-medium">Triggered by</th>
+              <th className="px-5 py-3 font-medium">Source</th>
               <th className="px-5 py-3 font-medium">Stage</th>
               <th className="px-5 py-3 font-medium">Result</th>
               <th className="px-5 py-3 font-medium">PR</th>
@@ -49,8 +49,17 @@ export function RunsTable({ runs, githubRepo, projectId }: Props) {
                 <td className="px-5 py-3 font-[family-name:var(--font-mono)] text-xs text-fg">
                   #{run.github_issue_number}
                 </td>
-                <td className="px-5 py-3 text-xs text-muted">
-                  {run.triggered_by ?? <span className="text-dim">&mdash;</span>}
+                <td className="max-w-[200px] px-5 py-3">
+                  {run.feedback_source ? (
+                    <div className="flex items-center gap-1.5">
+                      <MessageCircle className="h-3 w-3 shrink-0 text-accent" />
+                      <span className="truncate text-xs text-fg">
+                        {run.feedback_source.tester_name || 'Anonymous'}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-dim">Manual</span>
+                  )}
                 </td>
                 <td className="px-5 py-3">
                   <StageBadge stage={run.stage} />
