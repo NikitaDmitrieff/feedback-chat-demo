@@ -1,6 +1,8 @@
 import { createSupabaseClient } from './supabase.js'
 import { runManagedJob } from './worker.js'
 import { runSetupJob } from './setup-worker.js'
+import { classifyFailure } from './classify-failure.js'
+import { runSelfImproveJob } from './self-improve-worker.js'
 import { getInstallationToken, getInstallationFirstRepo, isGitHubAppConfigured } from './github-app.js'
 import { initCredentials, ensureValidToken } from './oauth.js'
 type Supabase = ReturnType<typeof createSupabaseClient>
@@ -120,6 +122,97 @@ async function findRunId(supabase: Supabase, projectId: string, issueNumber: num
   return data.id
 }
 
+async function handleFailedJob(
+  supabase: Supabase,
+  job: { id: string; project_id: string; job_type?: string; github_issue_number: number; issue_body: string },
+) {
+  // Recursion guard: never classify self_improve failures
+  if (job.job_type === 'self_improve' || job.job_type === 'setup') return
+
+  try {
+    // Find the run ID for this job
+    const { data: run } = await supabase
+      .from('pipeline_runs')
+      .select('id')
+      .eq('project_id', job.project_id)
+      .eq('github_issue_number', job.github_issue_number)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (!run) return
+
+    // Fetch logs for classification
+    const { data: logs } = await supabase
+      .from('run_logs')
+      .select('level, message')
+      .eq('run_id', run.id)
+      .order('timestamp', { ascending: false })
+      .limit(100)
+
+    const { data: jobData } = await supabase
+      .from('job_queue')
+      .select('last_error')
+      .eq('id', job.id)
+      .single()
+
+    // Classify
+    const classification = await classifyFailure({
+      logs: (logs || []).reverse(),
+      lastError: jobData?.last_error || '',
+      issueBody: job.issue_body,
+      jobType: job.job_type || 'implement',
+    })
+
+    if (!classification) return
+
+    // Store classification on the pipeline run
+    await supabase
+      .from('pipeline_runs')
+      .update({
+        failure_category: classification.category,
+        failure_analysis: classification.analysis,
+      })
+      .eq('id', run.id)
+
+    console.log(`[${WORKER_ID}] Classified failure for run ${run.id}: ${classification.category}`)
+
+    // Only spawn improvement job for our-fault categories
+    if (!['docs_gap', 'widget_bug', 'agent_bug'].includes(classification.category)) return
+
+    // Create self-improvement job
+    const payload = JSON.stringify({
+      fix_summary: classification.fix_summary,
+      original_issue_body: job.issue_body.slice(0, 2000),
+      log_excerpts: (logs || [])
+        .reverse()
+        .map((l: { level: string; message: string }) => `[${l.level}] ${l.message}`)
+        .join('\n')
+        .slice(-3000),
+    })
+
+    const { data: newJob } = await supabase
+      .from('job_queue')
+      .insert({
+        project_id: job.project_id,
+        github_issue_number: 0, // not tied to a consumer issue
+        issue_title: `Self-improve: ${classification.category}`,
+        issue_body: payload,
+        job_type: 'self_improve',
+        source_run_id: run.id,
+        status: 'pending',
+      })
+      .select('id')
+      .single()
+
+    if (newJob) {
+      console.log(`[${WORKER_ID}] Spawned self-improvement job ${newJob.id} (category: ${classification.category})`)
+    }
+  } catch (err) {
+    console.error(`[${WORKER_ID}] Failed to classify/spawn improvement:`, err instanceof Error ? err.message : err)
+  }
+}
+
 async function processJob(supabase: Supabase, job: {
   id: string
   project_id: string
@@ -128,6 +221,7 @@ async function processJob(supabase: Supabase, job: {
   github_issue_number: number
   issue_title: string
   issue_body: string
+  source_run_id?: string
 }) {
   console.log(`[${WORKER_ID}] Processing job ${job.id} (type=${job.job_type ?? 'implement'}, issue #${job.github_issue_number})`)
 
@@ -164,6 +258,40 @@ async function processJob(supabase: Supabase, job: {
         installationId: project.github_installation_id,
         supabase,
       })
+    } else if (job.job_type === 'self_improve') {
+      // Self-improvement job: clone feedback-chat and fix it
+      const { data: sourceRun } = await supabase
+        .from('pipeline_runs')
+        .select('failure_category, failure_analysis')
+        .eq('id', job.source_run_id)
+        .single()
+
+      if (!sourceRun?.failure_category) {
+        throw new Error(`Source run ${job.source_run_id} has no failure classification`)
+      }
+
+      // Parse the fix_summary from the job's issue_body (we store it as JSON)
+      let payload: { fix_summary?: string; original_issue_body?: string; log_excerpts?: string } = {}
+      try { payload = JSON.parse(job.issue_body) } catch {}
+
+      const result = await runSelfImproveJob({
+        jobId: job.id,
+        sourceRunId: job.source_run_id!,
+        failureCategory: sourceRun.failure_category,
+        failureAnalysis: sourceRun.failure_analysis || '',
+        fixSummary: payload.fix_summary || '',
+        originalIssueBody: payload.original_issue_body || '',
+        logExcerpts: payload.log_excerpts || '',
+        supabase,
+      })
+
+      if (result.prUrl) {
+        // Link the improvement job back to the source run
+        await supabase
+          .from('pipeline_runs')
+          .update({ improvement_job_id: job.id })
+          .eq('id', job.source_run_id)
+      }
     } else {
       // Default: implement job (existing flow)
       const creds = await fetchCredentials(supabase, job.project_id)
@@ -203,6 +331,7 @@ async function processJob(supabase: Supabase, job: {
             completed_at: new Date().toISOString(),
           })
           .eq('id', job.id)
+        await handleFailedJob(supabase, job)
       } else if ((job.attempt_count ?? 0) + 1 < MAX_ATTEMPTS) {
         // Retryable — reset to pending
         await supabase
@@ -225,6 +354,7 @@ async function processJob(supabase: Supabase, job: {
             completed_at: new Date().toISOString(),
           })
           .eq('id', job.id)
+        await handleFailedJob(supabase, job)
       }
     } catch (updateErr) {
       console.error(`[${WORKER_ID}] Failed to update job ${job.id} status:`, updateErr)
