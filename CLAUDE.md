@@ -53,9 +53,12 @@ packages/
   - `/api/ideas/[projectId]` — GET (list with optional status filter), POST (create user idea)
   - `/api/projects/[id]/settings` — GET/PATCH for product_context and strategic_nudges
   - `/api/projects/[id]/context/generate` — POST, fetches GitHub repo data and generates product summary via Haiku
+- Sidebar: Overview, Human (feedback), Minions (proposals + pipeline), Settings
+- Minions page: `/projects/[id]/minions` — tab switcher (Proposals | Pipeline). Proposals tab has "Your Input" card, pending/active/completed sections, proposal slide-over. Pipeline tab has stats bar, 3-lane Kanban, live logs
+- `/projects/[id]/proposals` and `/projects/[id]/pipeline` redirect to `/projects/[id]/minions`
+- Overview page: "Next Actions" cards (setup GitHub, add context, review proposals, send feedback) shown conditionally based on project state
 - Settings page: `/projects/[id]/settings` — product context (auto-generated from GitHub + editable), strategic nudges (persistent directives), setup & config (moved from overview)
-- Proposals page: `/projects/[id]/proposals` — "Your Input" card (quick idea box + create proposal), pending/active/completed sections, proposal slide-over with scores/edit/approve/reject
-- ProposalsCard on project overview — shows pending count with "Generate" trigger button
+- ProposalsCard on project overview — shows pending count with "Generate" trigger button, links to `/minions`
 - Supabase tables: `feedback_sessions`, `feedback_messages`, `feedback_themes`, `proposals`, `strategy_memory`, `user_ideas` (feedback_chat schema, RLS enabled)
 - Widget persistence: `createFeedbackHandler` accepts optional `supabase` config for fire-and-forget conversation storage
 - Dashboard uses `@ai-sdk/anthropic` + `ai` (v6) + `zod` for AI classification/digest
