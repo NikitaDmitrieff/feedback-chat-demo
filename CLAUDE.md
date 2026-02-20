@@ -494,6 +494,8 @@ Add this section to the consumer project's CLAUDE.md:
 - **Start command:** `npm start` runs `managed-worker.js` (not `server.js` — that's the legacy Fastify server)
 - **Linked locally:** `packages/agent/` is linked to this Railway project via `railway` CLI
 - **Job retry:** stale jobs (stuck in `processing` >30min) are reaped — retried up to 3 attempts with exponential backoff, or marked `failed` if exhausted. OAuth errors (`authentication_error`, `invalid_grant`, 401) are permanent failures (no retry). Columns: `job_queue.attempt_count`, `job_queue.last_error`
+- **Self-improvement:** when runs fail, the agent classifies the failure with Haiku (categories: `docs_gap`, `widget_bug`, `agent_bug`, `consumer_error`, `transient`). For our-fault failures, it spawns a `self_improve` job that clones feedback-chat, runs Claude CLI with the failure context, and creates a PR. Self-improvement jobs never recursively spawn more self-improvement jobs.
+- **New columns:** `pipeline_runs.failure_category`, `pipeline_runs.failure_analysis`, `pipeline_runs.improvement_job_id`; `job_queue.source_run_id`
 
 ### GitHub Repo
 
@@ -524,6 +526,9 @@ Add this section to the consumer project's CLAUDE.md:
 - `GITHUB_TOKEN` and `GITHUB_REPO` must be in `.env.local` or passed to both `createFeedbackHandler` and `createStatusHandler` — without them, issue creation silently fails and the status panel breaks
 - After installing the widget routes, the consumer should restart the dev server — HMR may not pick up new route files
 - Next.js 15+ with Turbopack may have cache corruption issues after dependency changes — if routes return 404 or the dev server panics, clear `.next/` and restart (or use `--turbopack=false`)
+- `self_improve` jobs use `GITHUB_TOKEN` (not installation tokens) to push to `NikitaDmitrieff/feedback-chat` — the GitHub App may not have access to the feedback-chat repo itself
+- Self-improvement jobs that fail do NOT spawn further self-improvement jobs (hard recursion guard)
+- The Haiku classification requires either `ANTHROPIC_API_KEY` or a valid OAuth token — if both are missing, classification is silently skipped
 
 ## Credential Security
 
