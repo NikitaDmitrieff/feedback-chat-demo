@@ -64,7 +64,7 @@ export function ProposalsCard({ projectId }: { projectId: string }) {
             Generate
           </button>
           <Link
-            href={`/projects/${projectId}/proposals`}
+            href={`/projects/${projectId}/minions`}
             className="flex items-center gap-1 text-[11px] text-accent transition-colors hover:text-fg"
           >
             View all
@@ -90,7 +90,7 @@ export function ProposalsCard({ projectId }: { projectId: string }) {
             {proposals.slice(0, 3).map(p => (
               <Link
                 key={p.id}
-                href={`/projects/${projectId}/proposals`}
+                href={`/projects/${projectId}/minions`}
                 className="flex items-center gap-3 rounded-lg bg-surface p-2.5 transition-colors hover:bg-surface-hover"
               >
                 <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOT[p.priority] ?? 'bg-gray-400'}`} />

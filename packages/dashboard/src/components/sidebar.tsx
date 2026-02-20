@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { FolderKanban, LayoutDashboard, MessageSquare, Lightbulb, Workflow, Settings, LogOut } from 'lucide-react'
+import { FolderKanban, LayoutDashboard, MessageSquare, Bot, Settings, LogOut } from 'lucide-react'
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -68,7 +68,7 @@ export function Sidebar() {
         </Link>
       )}
 
-      {/* Feedback (contextual — only when inside a project) */}
+      {/* Human (contextual — only when inside a project) */}
       {projectId && (
         <Link
           href={`/projects/${projectId}/feedback`}
@@ -81,41 +81,24 @@ export function Sidebar() {
           <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center">
             <MessageSquare className="h-[15px] w-[15px]" />
           </div>
-          {expanded && <span className="truncate text-xs">Feedback</span>}
+          {expanded && <span className="truncate text-xs">Human</span>}
         </Link>
       )}
 
-      {/* Proposals (contextual — only when inside a project) */}
+      {/* Minions (contextual — only when inside a project) */}
       {projectId && (
         <Link
-          href={`/projects/${projectId}/proposals`}
+          href={`/projects/${projectId}/minions`}
           className={`flex items-center rounded-[16px] transition-colors ${
-            pathname.includes('/proposals')
+            pathname.includes('/minions')
               ? 'bg-white/[0.08] text-fg'
               : 'text-muted hover:bg-white/[0.06] hover:text-fg'
           } ${expanded ? 'gap-2.5 px-2 py-2' : 'justify-center p-1.5'}`}
         >
           <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center">
-            <Lightbulb className="h-[15px] w-[15px]" />
+            <Bot className="h-[15px] w-[15px]" />
           </div>
-          {expanded && <span className="truncate text-xs">Proposals</span>}
-        </Link>
-      )}
-
-      {/* Pipeline (contextual — only when inside a project) */}
-      {projectId && (
-        <Link
-          href={`/projects/${projectId}/pipeline`}
-          className={`flex items-center rounded-[16px] transition-colors ${
-            pathname.includes('/pipeline')
-              ? 'bg-white/[0.08] text-fg'
-              : 'text-muted hover:bg-white/[0.06] hover:text-fg'
-          } ${expanded ? 'gap-2.5 px-2 py-2' : 'justify-center p-1.5'}`}
-        >
-          <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center">
-            <Workflow className="h-[15px] w-[15px]" />
-          </div>
-          {expanded && <span className="truncate text-xs">Pipeline</span>}
+          {expanded && <span className="truncate text-xs">Minions</span>}
         </Link>
       )}
 
