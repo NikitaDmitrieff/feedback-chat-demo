@@ -30,12 +30,14 @@ export async function runStrategizeJob(input: StrategizeInput): Promise<void> {
     { data: sessions },
     { data: recentProposals },
     { data: memory },
+    { data: pendingIdeas },
   ] = await Promise.all([
-    supabase.from('projects').select('name, github_repo, product_context').eq('id', projectId).single(),
+    supabase.from('projects').select('name, github_repo, product_context, strategic_nudges').eq('id', projectId).single(),
     supabase.from('feedback_themes').select('id, name, message_count, last_seen_at').eq('project_id', projectId).order('message_count', { ascending: false }).limit(20),
     supabase.from('feedback_sessions').select('id, ai_summary, ai_themes, tester_name, status').eq('project_id', projectId).order('last_message_at', { ascending: false }).limit(50),
     supabase.from('proposals').select('title, status, reject_reason').eq('project_id', projectId).order('created_at', { ascending: false }).limit(20),
     supabase.from('strategy_memory').select('title, event_type, themes, outcome_notes').eq('project_id', projectId).order('created_at', { ascending: false }).limit(30),
+    supabase.from('user_ideas').select('id, text, status').eq('project_id', projectId).eq('status', 'pending').order('created_at', { ascending: false }).limit(20),
   ])
 
   if (!project) {
@@ -66,6 +68,14 @@ export async function runStrategizeJob(input: StrategizeInput): Promise<void> {
     .map(m => `- [${m.event_type}] ${m.title}${m.outcome_notes ? `: ${m.outcome_notes}` : ''}`)
     .join('\n') || 'No history yet'
 
+  const nudgesContext = (project.strategic_nudges ?? []).length > 0
+    ? (project.strategic_nudges as string[]).map((n: string) => `- ${n}`).join('\n')
+    : ''
+
+  const ideasContext = (pendingIdeas ?? [])
+    .map(i => `- ${i.text}`)
+    .join('\n') || ''
+
   const anthropic = getAnthropicClient()
 
   // 3. Generate proposals
@@ -88,7 +98,8 @@ ${existingProposals}
 
 ## Strategy memory (past decisions — learn from rejections)
 ${memoryContext}
-
+${nudgesContext ? `\n## Strategic directives from the product owner (HIGH PRIORITY — follow these)\n${nudgesContext}\n` : ''}
+${ideasContext ? `\n## User-submitted ideas to consider\n${ideasContext}\n` : ''}
 Based on this data, identify 1-${MAX_PROPOSALS_PER_RUN} concrete improvement opportunities. For each:
 - Focus on recurring themes with high frequency
 - Do NOT re-propose anything that was recently rejected
@@ -190,6 +201,21 @@ Respond in JSON only:
       console.error(`[strategize] Failed to insert proposal: ${error.message}`)
     } else {
       console.log(`[strategize] Created proposal: "${raw.title}" (score: ${avgScore.toFixed(2)})`)
+    }
+  }
+
+  // Mark user ideas as incorporated or dismissed
+  if (pendingIdeas?.length) {
+    const proposalTexts = rawProposals.map(p => p.title.toLowerCase() + ' ' + p.rationale.toLowerCase())
+    for (const idea of pendingIdeas) {
+      const ideaWords = idea.text.toLowerCase().split(/\s+/)
+      const incorporated = proposalTexts.some(text =>
+        ideaWords.filter(w => w.length > 3).some(word => text.includes(word))
+      )
+      await supabase
+        .from('user_ideas')
+        .update({ status: incorporated ? 'incorporated' : 'dismissed' })
+        .eq('id', idea.id)
     }
   }
 }
