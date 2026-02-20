@@ -22,9 +22,11 @@ jobs:
           set -euo pipefail
 
           # Fetch active projects (with a github_repo configured)
+          # Tables live in feedback_chat schema — must set Accept-Profile / Content-Profile
           PROJECTS=$(curl -sf \
             -H "apikey: $SUPABASE_KEY" \
             -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Accept-Profile: feedback_chat" \
             "$SUPABASE_URL/rest/v1/projects?select=id&github_repo=not.is.null")
 
           echo "Found projects: $(echo "$PROJECTS" | jq -r 'length')"
@@ -39,6 +41,7 @@ jobs:
             RESULT=$(curl -sf -X POST \
               -H "apikey: $SUPABASE_KEY" \
               -H "Authorization: Bearer $SUPABASE_KEY" \
+              -H "Content-Profile: feedback_chat" \
               -H "Content-Type: application/json" \
               -H "Prefer: return=representation" \
               "$SUPABASE_URL/rest/v1/job_queue" \
