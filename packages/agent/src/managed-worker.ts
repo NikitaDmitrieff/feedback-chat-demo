@@ -3,6 +3,7 @@ import { runManagedJob } from './worker.js'
 import { runSetupJob } from './setup-worker.js'
 import { classifyFailure } from './classify-failure.js'
 import { runSelfImproveJob } from './self-improve-worker.js'
+import { runStrategizeJob } from './strategize-worker.js'
 import { getInstallationToken, getInstallationFirstRepo, isGitHubAppConfigured } from './github-app.js'
 import { initCredentials, ensureValidToken } from './oauth.js'
 type Supabase = ReturnType<typeof createSupabaseClient>
@@ -302,6 +303,12 @@ async function processJob(supabase: Supabase, job: {
           .update({ improvement_job_id: job.id })
           .eq('id', job.source_run_id)
       }
+    } else if (job.job_type === 'strategize') {
+      await runStrategizeJob({
+        jobId: job.id,
+        projectId: job.project_id,
+        supabase,
+      })
     } else {
       // Default: implement job (existing flow)
       const creds = await fetchCredentials(supabase, job.project_id)
