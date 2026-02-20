@@ -223,7 +223,7 @@ async function processJob(supabase: Supabase, job: {
   issue_body: string
   source_run_id?: string
 }) {
-  console.log(`[${WORKER_ID}] Processing job ${job.id} (type=${job.job_type ?? 'implement'}, issue #${job.github_issue_number})`)
+  console.log(`[${WORKER_ID}] Processing job ${job.id} (type=${job.job_type ?? 'implement'}, ${job.job_type === 'self_improve' ? `source_run=${job.source_run_id}` : `issue #${job.github_issue_number}`})`)
 
   try {
     // Dispatch based on job type

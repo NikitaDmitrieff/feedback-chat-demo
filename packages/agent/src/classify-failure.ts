@@ -51,15 +51,17 @@ export async function classifyFailure(input: ClassifyInput): Promise<FailureClas
     .map((l) => `[${l.level}] ${l.message}`)
     .join('\n')
 
-  const client = getAnthropicClient()
+  let response
+  try {
+    const client = getAnthropicClient()
 
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1024,
-    messages: [
-      {
-        role: 'user',
-        content: `You are analyzing a failed agent run. The agent tried to implement a feature on a consumer's Next.js repo using the @nikitadmitrieff/feedback-chat widget.
+    response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      messages: [
+        {
+          role: 'user',
+          content: `You are analyzing a failed agent run. The agent tried to implement a feature on a consumer's Next.js repo using the @nikitadmitrieff/feedback-chat widget.
 
 Classify this failure into ONE of these categories:
 - **docs_gap**: The failure happened because CLAUDE.md, installation instructions, or gotchas in the feedback-chat repo are incomplete or wrong. The agent didn't know how to handle a situation that should have been documented.
@@ -81,9 +83,13 @@ ${logText.slice(-3000)}
 
 Respond with ONLY a JSON object (no markdown, no code fences):
 {"category": "one_of_the_five", "analysis": "One paragraph explaining what went wrong and why this category.", "fix_summary": "One sentence: what should be changed in the feedback-chat repo to prevent this. Use 'N/A' for consumer_error and transient."}`,
-      },
-    ],
-  })
+        },
+      ],
+    })
+  } catch (err) {
+    console.error('[classify] Haiku API call failed:', err instanceof Error ? err.message : err)
+    return null
+  }
 
   try {
     const text = response.content[0].type === 'text' ? response.content[0].text : ''

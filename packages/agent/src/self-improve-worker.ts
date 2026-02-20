@@ -117,7 +117,7 @@ ${scopeInstructions[input.failureCategory] || 'Analyze the failure and make the 
 }
 
 export async function runSelfImproveJob(input: SelfImproveInput): Promise<{ prUrl: string | null }> {
-  const { jobId, sourceRunId, failureCategory, supabase } = input
+  const { sourceRunId, failureCategory, supabase } = input
   const shortHash = sourceRunId.slice(0, 8)
   const branch = `fix/${failureCategory}-${shortHash}`
   const workDir = `/tmp/self-improve-${shortHash}`
@@ -131,7 +131,10 @@ export async function runSelfImproveJob(input: SelfImproveInput): Promise<{ prUr
     const token = process.env.GITHUB_TOKEN
     if (!token) throw new Error('GITHUB_TOKEN required for self-improvement jobs')
 
-    run(`git clone --depth=1 https://x-access-token:${token}@github.com/${FEEDBACK_CHAT_REPO}.git ${workDir}`, '/tmp')
+    // Clone without token in URL to avoid leaking it in error messages
+    run(`git clone --depth=1 https://github.com/${FEEDBACK_CHAT_REPO}.git ${workDir}`, '/tmp')
+    // Set authenticated remote for push
+    run(`git remote set-url origin https://x-access-token:${token}@github.com/${FEEDBACK_CHAT_REPO}.git`, workDir)
     run('npm install', workDir)
 
     // 2. Run Claude CLI with failure context
@@ -203,6 +206,7 @@ ${input.fixSummary}
         Authorization: `Bearer ${token}`,
         Accept: 'application/vnd.github+json',
         'Content-Type': 'application/json',
+        'X-GitHub-Api-Version': '2022-11-28',
       },
       body: JSON.stringify({
         title: prTitle,
