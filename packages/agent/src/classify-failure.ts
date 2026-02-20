@@ -28,13 +28,13 @@ function getAnthropicClient(): Anthropic {
     return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   }
 
-  // Otherwise, try reading the OAuth access token
+  // Otherwise, try reading the OAuth access token (bearer auth, not API key)
   try {
     const credsPath = join(homedir(), '.claude', '.credentials.json')
     const creds = JSON.parse(readFileSync(credsPath, 'utf-8'))
     const accessToken = creds?.claudeAiOauth?.accessToken
     if (accessToken) {
-      return new Anthropic({ apiKey: accessToken })
+      return new Anthropic({ authToken: accessToken })
     }
   } catch {}
 
