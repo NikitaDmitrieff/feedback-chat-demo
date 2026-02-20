@@ -487,9 +487,9 @@ Add this section to the consumer project's CLAUDE.md:
 - **Public domain:** `postbac-agent-production.up.railway.app`
 - **Source:** `packages/agent/`
 - **Dockerfile:** multi-stage build, CMD is `managed-worker.js` (polls Supabase `job_queue`)
-- **Auth:** OAuth only (`CLAUDE_CREDENTIALS_JSON`) — no `ANTHROPIC_API_KEY`
+- **Auth:** OAuth (`CLAUDE_CREDENTIALS_JSON`) for Claude CLI jobs + `ANTHROPIC_API_KEY` for Haiku classification
 - **OAuth auto-refresh:** tokens are refreshed before each job and persisted to Supabase `system_credentials` table. On container restart, the agent reads from Supabase (not the env var). You should only need to run `npm run credentials` once to seed the initial token.
-- **Env vars:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `CLAUDE_CREDENTIALS_JSON`
+- **Env vars:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `CLAUDE_CREDENTIALS_JSON`, `ANTHROPIC_API_KEY` (for Haiku classifier)
 - **Deploy:** `cd packages/agent && railway up --detach`
 - **Start command:** `npm start` runs `managed-worker.js` (not `server.js` — that's the legacy Fastify server)
 - **Linked locally:** `packages/agent/` is linked to this Railway project via `railway` CLI
@@ -528,7 +528,7 @@ Add this section to the consumer project's CLAUDE.md:
 - Next.js 15+ with Turbopack may have cache corruption issues after dependency changes — if routes return 404 or the dev server panics, clear `.next/` and restart (or use `--turbopack=false`)
 - `self_improve` jobs use `GITHUB_TOKEN` env var (not installation tokens) to push to `NikitaDmitrieff/feedback-chat`. For self-improvement to work, the agent needs a PAT (`ghp_` prefix) with push access to the feedback-chat repo — GitHub App installation tokens are scoped to consumer repos and won't work
 - Self-improvement jobs that fail do NOT spawn further self-improvement jobs (hard recursion guard)
-- The Haiku classification requires either `ANTHROPIC_API_KEY` or a valid OAuth token — if both are missing, classification is silently skipped
+- The Haiku classification requires `ANTHROPIC_API_KEY` — OAuth tokens do NOT work for direct Anthropic API calls (only for Claude Code CLI). Without `ANTHROPIC_API_KEY`, classification is silently skipped
 
 ## Credential Security
 

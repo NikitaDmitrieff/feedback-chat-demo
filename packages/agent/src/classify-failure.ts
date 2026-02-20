@@ -1,7 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { readFileSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
 
 export type FailureCategory = 'docs_gap' | 'widget_bug' | 'agent_bug' | 'consumer_error' | 'transient'
 
@@ -23,22 +20,13 @@ interface ClassifyInput {
 const VALID_CATEGORIES: FailureCategory[] = ['docs_gap', 'widget_bug', 'agent_bug', 'consumer_error', 'transient']
 
 function getAnthropicClient(): Anthropic {
-  // If we have an API key, use it directly (cheapest path for classification)
+  // API key is required for classification — OAuth tokens don't support direct API calls
   if (process.env.ANTHROPIC_API_KEY) {
     return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   }
 
-  // Otherwise, try reading the OAuth access token (bearer auth, not API key)
-  try {
-    const credsPath = join(homedir(), '.claude', '.credentials.json')
-    const creds = JSON.parse(readFileSync(credsPath, 'utf-8'))
-    const accessToken = creds?.claudeAiOauth?.accessToken
-    if (accessToken) {
-      return new Anthropic({ authToken: accessToken })
-    }
-  } catch {}
-
   // Fallback: let the SDK try default env vars
+  console.warn('[classify] No ANTHROPIC_API_KEY set — classification requires an API key (OAuth tokens are not supported for direct API calls)')
   return new Anthropic()
 }
 
@@ -93,9 +81,14 @@ Respond with ONLY a JSON object (no markdown, no code fences):
 
   try {
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
-    const parsed = JSON.parse(text)
+    // Strip markdown code fences if Haiku wraps the JSON
+    const cleaned = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim()
+    const parsed = JSON.parse(cleaned)
 
-    if (!VALID_CATEGORIES.includes(parsed.category)) return null
+    if (!VALID_CATEGORIES.includes(parsed.category)) {
+      console.error('[classify] Invalid category:', parsed.category)
+      return null
+    }
 
     return {
       category: parsed.category,
@@ -103,7 +96,8 @@ Respond with ONLY a JSON object (no markdown, no code fences):
       fix_summary: String(parsed.fix_summary || ''),
     }
   } catch {
-    console.error('[classify] Failed to parse Haiku response')
+    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    console.error('[classify] Failed to parse Haiku response:', text.slice(0, 300))
     return null
   }
 }

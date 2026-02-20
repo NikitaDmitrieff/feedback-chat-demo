@@ -131,7 +131,7 @@ async function handleFailedJob(
 
   try {
     // Find the run ID for this job
-    const { data: run } = await supabase
+    const { data: run, error: runError } = await supabase
       .from('pipeline_runs')
       .select('id')
       .eq('project_id', job.project_id)
@@ -140,7 +140,12 @@ async function handleFailedJob(
       .limit(1)
       .single()
 
-    if (!run) return
+    if (!run) {
+      console.warn(`[${WORKER_ID}] handleFailedJob: no pipeline_run for project=${job.project_id} issue=#${job.github_issue_number}`, runError?.message)
+      return
+    }
+
+    console.log(`[${WORKER_ID}] handleFailedJob: found run ${run.id}, fetching logs...`)
 
     // Fetch logs for classification
     const { data: logs } = await supabase
@@ -156,6 +161,8 @@ async function handleFailedJob(
       .eq('id', job.id)
       .single()
 
+    console.log(`[${WORKER_ID}] handleFailedJob: ${(logs || []).length} logs, lastError=${(jobData?.last_error || '').slice(0, 100)}`)
+
     // Classify
     const classification = await classifyFailure({
       logs: (logs || []).reverse(),
@@ -164,7 +171,10 @@ async function handleFailedJob(
       jobType: job.job_type || 'implement',
     })
 
-    if (!classification) return
+    if (!classification) {
+      console.warn(`[${WORKER_ID}] handleFailedJob: classification returned null`)
+      return
+    }
 
     // Store classification on the pipeline run
     await supabase
