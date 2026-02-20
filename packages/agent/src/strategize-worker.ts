@@ -210,7 +210,7 @@ Respond in JSON only:
     for (const idea of pendingIdeas) {
       const ideaWords = idea.text.toLowerCase().split(/\s+/)
       const incorporated = proposalTexts.some(text =>
-        ideaWords.filter(w => w.length > 3).some(word => text.includes(word))
+        ideaWords.filter((w: string) => w.length > 3).some((word: string) => text.includes(word))
       )
       await supabase
         .from('user_ideas')
