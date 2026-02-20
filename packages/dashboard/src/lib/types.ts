@@ -158,3 +158,11 @@ export type StrategyMemoryEvent = {
   edit_distance: number | null
   created_at: string
 }
+
+export type UserIdea = {
+  id: string
+  project_id: string
+  text: string
+  status: 'pending' | 'incorporated' | 'dismissed'
+  created_at: string
+}
