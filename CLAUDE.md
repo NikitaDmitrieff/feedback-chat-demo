@@ -526,7 +526,7 @@ Add this section to the consumer project's CLAUDE.md:
 - `GITHUB_TOKEN` and `GITHUB_REPO` must be in `.env.local` or passed to both `createFeedbackHandler` and `createStatusHandler` — without them, issue creation silently fails and the status panel breaks
 - After installing the widget routes, the consumer should restart the dev server — HMR may not pick up new route files
 - Next.js 15+ with Turbopack may have cache corruption issues after dependency changes — if routes return 404 or the dev server panics, clear `.next/` and restart (or use `--turbopack=false`)
-- `self_improve` jobs use `GITHUB_TOKEN` (not installation tokens) to push to `NikitaDmitrieff/feedback-chat` — the GitHub App may not have access to the feedback-chat repo itself
+- `self_improve` jobs use `GITHUB_TOKEN` env var (not installation tokens) to push to `NikitaDmitrieff/feedback-chat`. For self-improvement to work, the agent needs a PAT (`ghp_` prefix) with push access to the feedback-chat repo — GitHub App installation tokens are scoped to consumer repos and won't work
 - Self-improvement jobs that fail do NOT spawn further self-improvement jobs (hard recursion guard)
 - The Haiku classification requires either `ANTHROPIC_API_KEY` or a valid OAuth token — if both are missing, classification is silently skipped
 
