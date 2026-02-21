@@ -113,9 +113,9 @@ export function PipelineTab({ projectId, githubRepo, proposals: initialProposals
     r.result && !proposalIssueNumbers.has(r.github_issue_number)
   ).slice(0, 10)
 
-  // Stats
-  const totalRuns = runs.length
-  const successRuns = runs.filter(r => r.result === 'success').length
+  // Stats — unified lifecycle counts
+  const rejectedCount = proposals.filter(p => p.status === 'rejected').length
+  const shippedCount = proposals.filter(p => p.status === 'done').length
   const activeCount = activeProposals.length + activeRuns.length + activeJobs.filter(j => j.status === 'processing').length
 
   function handleUpdate(updated: Proposal) {
@@ -130,31 +130,29 @@ export function PipelineTab({ projectId, githubRepo, proposals: initialProposals
         <div className="glass-card flex items-center gap-3 p-4">
           <Lightbulb className="h-4 w-4 text-accent" />
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Pending</p>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Pending Review</p>
             <p className="text-lg font-semibold tabular-nums text-fg">{draftProposals.length}</p>
           </div>
         </div>
         <div className="glass-card flex items-center gap-3 p-4">
           <Loader2 className={`h-4 w-4 ${activeCount > 0 ? 'animate-spin text-accent' : 'text-muted'}`} />
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Active</p>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted">In Progress</p>
             <p className="text-lg font-semibold tabular-nums text-fg">{activeCount}</p>
           </div>
         </div>
         <div className="glass-card flex items-center gap-3 p-4">
           <CheckCircle2 className="h-4 w-4 text-success" />
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Success Rate</p>
-            <p className="text-lg font-semibold tabular-nums text-fg">
-              {totalRuns > 0 ? `${Math.round((successRuns / totalRuns) * 100)}%` : '—'}
-            </p>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Shipped</p>
+            <p className="text-lg font-semibold tabular-nums text-fg">{shippedCount}</p>
           </div>
         </div>
         <div className="glass-card flex items-center gap-3 p-4">
-          <Clock className="h-4 w-4 text-muted" />
+          <XCircle className="h-4 w-4 text-red-400/60" />
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Total Runs</p>
-            <p className="text-lg font-semibold tabular-nums text-fg">{totalRuns}</p>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Rejected</p>
+            <p className="text-lg font-semibold tabular-nums text-fg">{rejectedCount}</p>
           </div>
         </div>
       </div>
@@ -214,10 +212,13 @@ export function PipelineTab({ projectId, githubRepo, proposals: initialProposals
               const run = p.github_issue_number ? runByIssue.get(p.github_issue_number) : null
               return (
                 <div key={p.id} className="glass-card p-3">
-                  <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => setSelected(p)}
+                    className="flex w-full items-center justify-between text-left"
+                  >
                     <p className="truncate text-sm font-medium text-fg">{p.title}</p>
                     {run && <StageBadge stage={run.stage} result={run.result} />}
-                  </div>
+                  </button>
                   {p.branch_name && (
                     <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-dim">
                       <GitBranch className="h-3 w-3" />
@@ -293,7 +294,11 @@ export function PipelineTab({ projectId, githubRepo, proposals: initialProposals
             {completedProposals.map(p => {
               const run = p.github_issue_number ? runByIssue.get(p.github_issue_number) : null
               return (
-                <div key={p.id} className="glass-card p-3">
+                <button
+                  key={p.id}
+                  onClick={() => setSelected(p)}
+                  className="glass-card w-full p-3 text-left transition-colors hover:bg-white/[0.06]"
+                >
                   <div className="flex items-center justify-between">
                     <p className="truncate text-sm font-medium text-fg">{p.title}</p>
                     {p.status === 'rejected' ? (
@@ -306,18 +311,13 @@ export function PipelineTab({ projectId, githubRepo, proposals: initialProposals
                       <span className="text-[11px] font-medium text-success">{p.status}</span>
                     )}
                   </div>
-                  {run?.github_pr_number && githubRepo && (
-                    <a
-                      href={`https://github.com/${githubRepo}/pull/${run.github_pr_number}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-1.5 flex items-center gap-1.5 text-[11px] text-accent hover:text-fg"
-                    >
-                      PR #{run.github_pr_number}
-                      <ExternalLink className="h-2.5 w-2.5" />
-                    </a>
+                  {p.github_issue_number && (
+                    <div className="mt-1.5 flex items-center gap-2 text-[11px] text-dim">
+                      <span>Issue #{p.github_issue_number}</span>
+                      {run?.github_pr_number && <span>→ PR #{run.github_pr_number}</span>}
+                    </div>
                   )}
-                </div>
+                </button>
               )
             })}
 

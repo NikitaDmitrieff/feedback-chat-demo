@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, Edit3, Loader2, X, ExternalLink, GitBranch } from 'lucide-react'
-import type { Proposal } from '@/lib/types'
+import { Check, Edit3, Loader2, X, ExternalLink, GitBranch, ArrowRight } from 'lucide-react'
+import type { Proposal, PipelineRun } from '@/lib/types'
 import { LiveLogTail } from './live-log-tail'
+import { DeploymentPreview } from './deployment-preview'
 
 type Props = {
   proposal: Proposal
@@ -46,6 +47,7 @@ export function ProposalSlideOver({ proposal, projectId, githubRepo, onClose, on
   const [branchName, setBranchName] = useState(
     proposal.branch_name || `proposals/${slugify(proposal.title)}`
   )
+  const [relatedRun, setRelatedRun] = useState<PipelineRun | null>(null)
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -54,6 +56,19 @@ export function ProposalSlideOver({ proposal, projectId, githubRepo, onClose, on
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
+
+  // Fetch related pipeline run for proposals that have a GitHub issue
+  useEffect(() => {
+    if (!proposal.github_issue_number || proposal.status === 'draft') return
+    fetch(`/api/runs/${projectId}`)
+      .then(res => res.json())
+      .then(data => {
+        const runs: PipelineRun[] = data.runs ?? data ?? []
+        const match = runs.find(r => r.github_issue_number === proposal.github_issue_number)
+        if (match) setRelatedRun(match)
+      })
+      .catch(() => {})
+  }, [projectId, proposal.github_issue_number, proposal.status])
 
   async function handleAction(action: 'approve' | 'reject') {
     setLoading(true)
@@ -222,6 +237,48 @@ export function ProposalSlideOver({ proposal, projectId, githubRepo, onClose, on
                 Agent Progress
               </h3>
               <LiveLogTail projectId={projectId} runId={activeRunId} />
+            </div>
+          )}
+
+          {/* Pipeline run + deployment preview (non-draft proposals with a related run) */}
+          {relatedRun && proposal.status !== 'draft' && (
+            <div className="mb-5">
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted">
+                Pipeline Run
+              </h3>
+              <div className="rounded-lg bg-surface p-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                    relatedRun.result === 'success' ? 'text-emerald-400 bg-emerald-400/10' :
+                    relatedRun.result === 'failed' ? 'text-red-400 bg-red-400/10' :
+                    'text-amber-400 bg-amber-400/10'
+                  }`}>
+                    {relatedRun.result ?? relatedRun.stage}
+                  </span>
+                  {relatedRun.github_pr_number && githubRepo && (
+                    <a
+                      href={`https://github.com/${githubRepo}/pull/${relatedRun.github_pr_number}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-auto flex items-center gap-1 text-xs text-accent transition-colors hover:text-fg"
+                    >
+                      PR #{relatedRun.github_pr_number}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  <a
+                    href={`/projects/${projectId}/runs/${relatedRun.id}`}
+                    className={`flex items-center gap-1 text-xs text-muted transition-colors hover:text-fg ${relatedRun.github_pr_number && githubRepo ? '' : 'ml-auto'}`}
+                  >
+                    View run <ArrowRight className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Deployment preview iframe */}
+              <div className="mt-3">
+                <DeploymentPreview projectId={projectId} runId={relatedRun.id} />
+              </div>
             </div>
           )}
 

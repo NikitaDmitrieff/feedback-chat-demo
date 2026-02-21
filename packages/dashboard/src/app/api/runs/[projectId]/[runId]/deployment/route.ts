@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getInstallationOctokit } from '@/lib/github-app'
 
 export async function GET(
   _request: NextRequest,
@@ -20,37 +21,44 @@ export async function GET(
     return NextResponse.json({ state: null, previewUrl: null, description: null })
   }
 
-  // Get the project's GitHub repo
+  // Get the project's GitHub repo + installation ID
   const { data: project } = await supabase
     .from('projects')
-    .select('github_repo')
+    .select('github_repo, github_installation_id')
     .eq('id', projectId)
     .single()
 
-  if (!project) {
+  if (!project?.github_repo) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   }
 
   const [owner, repo] = project.github_repo.split('/')
 
-  // Fetch PR to get head SHA
-  // Note: We use the user's GitHub token from credentials, or fall back to env
-  const { data: cred } = await supabase
-    .from('credentials')
-    .select('encrypted_value')
-    .eq('project_id', projectId)
-    .limit(1)
-    .single()
+  // Use GitHub App installation token if available, fall back to GITHUB_TOKEN env var
+  let headers: Record<string, string>
 
-  // For now, use GITHUB_TOKEN from env as fallback
-  const githubToken = process.env.GITHUB_TOKEN
-  if (!githubToken) {
-    return NextResponse.json({ state: null, previewUrl: null, description: 'No GitHub token configured' })
-  }
-
-  const headers = {
-    Authorization: `Bearer ${githubToken}`,
-    Accept: 'application/vnd.github.v3+json',
+  if (project.github_installation_id) {
+    try {
+      const octokit = await getInstallationOctokit(project.github_installation_id)
+      const { token } = (await octokit.auth({ type: 'installation' })) as { token: string }
+      headers = {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      }
+    } catch {
+      return NextResponse.json({ state: null, previewUrl: null, description: 'GitHub App authentication failed' })
+    }
+  } else if (process.env.GITHUB_TOKEN) {
+    headers = {
+      Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github.v3+json',
+    }
+  } else {
+    return NextResponse.json({
+      state: null,
+      previewUrl: null,
+      description: 'Connect GitHub via Settings to enable deployment previews',
+    })
   }
 
   // Get PR head SHA
