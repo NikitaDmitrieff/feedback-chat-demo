@@ -9,6 +9,7 @@ import { initCredentials, ensureValidToken } from './oauth.js'
 type Supabase = ReturnType<typeof createSupabaseClient>
 
 const POLL_INTERVAL_MS = 5_000
+const PAUSE_POLL_MS = 30_000
 const STALE_THRESHOLD_MINUTES = 30
 const MAX_ATTEMPTS = 3
 const MAX_BACKOFF_MS = 60_000
@@ -127,8 +128,8 @@ async function handleFailedJob(
   supabase: Supabase,
   job: { id: string; project_id: string; job_type?: string; github_issue_number: number; issue_body: string },
 ) {
-  // Recursion guard: never classify self_improve failures
-  if (job.job_type === 'self_improve' || job.job_type === 'setup') return
+  // Recursion guard: only classify agent (implement) job failures
+  if (job.job_type === 'self_improve' || job.job_type === 'setup' || job.job_type === 'strategize') return
 
   try {
     // Find the run ID for this job
@@ -391,6 +392,11 @@ async function main() {
   let consecutiveErrors = 0
 
   while (true) {
+    if (process.env.WORKER_PAUSED === 'true') {
+      await new Promise((r) => setTimeout(r, PAUSE_POLL_MS))
+      continue
+    }
+
     try {
       await reapStaleJobs(supabase)
 

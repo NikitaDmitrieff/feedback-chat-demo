@@ -14,10 +14,10 @@ const MAX_PROPOSALS_PER_RUN = 3
 const MIN_SCORE_THRESHOLD = 0.6
 
 function getAnthropicClient(): Anthropic {
-  if (process.env.ANTHROPIC_API_KEY) {
-    return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error('ANTHROPIC_API_KEY is required for strategize jobs (OAuth tokens are not supported for direct API calls)')
   }
-  return new Anthropic()
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 }
 
 export async function runStrategizeJob(input: StrategizeInput): Promise<void> {
