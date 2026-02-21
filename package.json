@@ -6,7 +6,8 @@
     "build": "turbo build",
     "dev": "turbo dev",
     "test": "turbo test",
-    "lint": "turbo lint"
+    "lint": "turbo lint",
+    "switch": "bash scripts/switch-worker.sh"
   },
   "packageManager": "npm@10.9.4",
   "devDependencies": {

@@ -1,44 +1,86 @@
 # feedback-chat
 
-AI-powered feedback widget for Next.js. Users chat with an AI advisor, and depending on your tier, feedback can automatically become GitHub issues or even fully implemented PRs.
+AI-powered feedback widget for Next.js. Users chat with an AI advisor, feedback becomes GitHub issues, an autonomous agent implements them, and the system learns from its own failures.
 
 ```
-User chats with AI → refines idea → GitHub issue → Claude agent implements → PR → preview → approve
+User chats → GitHub issue → Claude agent implements → PR → preview → approve
+                                    ↓ (on failure)
+                              Haiku classifies → self-improve job → fix PR
 ```
 
-## What You Need
+## Quick Actions
 
-Check what you have, then pick the highest tier you can run:
+```bash
+npm run dev          # Start everything (widget + dashboard + agent dev)
+npm run build        # Build all packages
+npm run test         # Run tests
+npm run switch       # Toggle worker between local and Railway
+```
 
-| You have... | You can run... |
-|-------------|---------------|
-| Anthropic API key | **Chat only** — AI conversations, localStorage persistence |
-| + GitHub PAT + repo | **+ GitHub** — Chat + auto-creates issues from feedback |
-| + Railway or Docker + Claude Max or API key | **+ Pipeline** — Chat + GitHub + autonomous code agent |
+### Switch worker location
 
-Each tier builds on the previous one. You can start with Chat and upgrade later.
+The agent worker can run on Railway (24/7) or locally (for development/debugging). Toggle with:
 
-### Prerequisites checklist
+```bash
+npm run switch       # Local → Railway, or Railway → local
+```
 
-| Prerequisite | Required for | How to get it |
-|-------------|-------------|---------------|
-| `ANTHROPIC_API_KEY` | All tiers | [console.anthropic.com](https://console.anthropic.com/) |
-| `FEEDBACK_PASSWORD` | All tiers | Any string you choose |
-| `GITHUB_TOKEN` (PAT, `ghp_` prefix) | GitHub, Pipeline | [github.com/settings/tokens/new](https://github.com/settings/tokens/new) — `repo` + `workflow` scopes |
-| `GITHUB_REPO` | GitHub, Pipeline | Format: `owner/repo` |
-| `railway` CLI | Pipeline (Railway) | `npm install -g @railway/cli` |
-| `gh` CLI | Labels + webhook automation | [cli.github.com](https://cli.github.com/) (optional — can do manually) |
-| Claude Max **or** `ANTHROPIC_API_KEY` | Pipeline agent | Max = $0/run via OAuth; API key = pay per token |
+First run starts the worker locally and pauses Railway. Run again to stop local and resume Railway.
 
-> **`GITHUB_TOKEN` must be a Personal Access Token (`ghp_` prefix).** Do not use `gh auth token` — it returns a short-lived OAuth token (`gho_`) that expires in ~8 hours.
+### Dashboard
 
-> **React 19.1.0 and 19.1.1 are excluded** by `@ai-sdk/react`. Check with `npm ls react` — if affected, run `npm install react@latest react-dom@latest` before proceeding.
+```bash
+npm run dev          # → http://localhost:3001
+```
 
-## Install
+Production: [loop.joincoby.com](https://loop.joincoby.com)
 
-These steps are the same regardless of tier.
+The dashboard shows projects, pipeline runs, failure classifications, self-improvement PRs, feedback sessions, tester activity, and AI-generated proposals.
 
-### 1. Install the package
+---
+
+## Architecture
+
+```
+feedback-chat/
+├── packages/
+│   ├── widget/      ← npm package (@nikitadmitrieff/feedback-chat)
+│   │   └── src/
+│   │       ├── client/   ← React components (FeedbackPanel, PipelineTracker)
+│   │       ├── server/   ← Route handler factories
+│   │       └── cli/      ← npx setup wizard + deploy script
+│   ├── agent/       ← Managed worker (polls Supabase, runs Claude CLI)
+│   │   └── src/
+│   │       ├── managed-worker.ts   ← Job loop (claim → process → retry/fail)
+│   │       ├── worker.ts           ← Implement jobs (clone → Claude → validate → PR)
+│   │       ├── setup-worker.ts     ← Setup jobs (widget installation on consumer repos)
+│   │       ├── self-improve-worker.ts ← Self-fix jobs (clone feedback-chat → fix → PR)
+│   │       ├── strategize-worker.ts   ← AI proposals from feedback themes
+│   │       ├── classify-failure.ts    ← Haiku failure classification
+│   │       └── oauth.ts              ← Claude Max token refresh
+│   └── dashboard/   ← Next.js app (Supabase backend)
+│       ├── src/app/projects/   ← Project management, runs, feedback, proposals
+│       └── supabase/migrations/
+├── scripts/
+│   └── switch-worker.sh   ← Local/Railway toggle
+└── docs/
+```
+
+### How the pipeline works
+
+1. **Feedback** — User chats via the widget, AI refines the idea into a GitHub issue
+2. **Queue** — Issue webhook enqueues a job in Supabase `job_queue`
+3. **Implement** — Worker claims job, clones consumer repo, runs Claude CLI, validates build, creates PR
+4. **Retry** — Failed jobs retry up to 3 times with exponential backoff. Stale jobs (>30min) are reaped.
+5. **Classify** — After 3 failures, Haiku classifies the root cause: `docs_gap`, `widget_bug`, `agent_bug`, `consumer_error`, or `transient`
+6. **Self-improve** — For our-fault failures (`docs_gap`/`widget_bug`/`agent_bug`), a `self_improve` job clones this repo, runs Claude CLI with the failure context, and creates a fix PR
+7. **Strategize** — AI reads accumulated feedback themes and proposes product improvements for human review (weekly cron + manual trigger)
+
+---
+
+## Install the Widget
+
+### 1. Install
 
 ```bash
 npm install @nikitadmitrieff/feedback-chat \
@@ -46,19 +88,19 @@ npm install @nikitadmitrieff/feedback-chat \
   ai @ai-sdk/anthropic
 ```
 
+> **React 19.1.0 and 19.1.1 are excluded** by `@ai-sdk/react`. Check with `npm ls react` — upgrade if needed.
+
 ### 2. Configure Tailwind v4
 
-Add this line to your `globals.css`, right after `@import "tailwindcss"`:
+In `globals.css`, after `@import "tailwindcss"`:
 
 ```css
 @source "../node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js";
 ```
 
-**This is mandatory.** Tailwind v4 does not scan `node_modules`. Without this line, the widget renders completely unstyled.
+**Mandatory.** Without this, the widget renders unstyled.
 
 ### 3. Create API routes
-
-Create two route files in your Next.js app directory (`app/` or `src/app/`):
 
 **`api/feedback/chat/route.ts`**
 
@@ -67,13 +109,7 @@ import { createFeedbackHandler } from '@nikitadmitrieff/feedback-chat/server'
 
 const handler = createFeedbackHandler({
   password: process.env.FEEDBACK_PASSWORD!,
-  // projectContext: 'Brief description of your app — helps the AI give better advice',
-
-  // Uncomment for +GitHub or +Pipeline:
-  // github: {
-  //   token: process.env.GITHUB_TOKEN!,
-  //   repo: process.env.GITHUB_REPO!,
-  // },
+  // github: { token: process.env.GITHUB_TOKEN!, repo: process.env.GITHUB_REPO! },
 })
 
 export const POST = handler.POST
@@ -86,29 +122,19 @@ import { createStatusHandler } from '@nikitadmitrieff/feedback-chat/server'
 
 const handler = createStatusHandler({
   password: process.env.FEEDBACK_PASSWORD!,
-
-  // Uncomment for +GitHub or +Pipeline:
-  // github: {
-  //   token: process.env.GITHUB_TOKEN!,
-  //   repo: process.env.GITHUB_REPO!,
-  // },
-
-  // Uncomment for +Pipeline only:
+  // github: { token: process.env.GITHUB_TOKEN!, repo: process.env.GITHUB_REPO! },
   // agentUrl: process.env.AGENT_URL,
 })
 
 export const { GET, POST } = handler
 ```
 
-Uncomment the lines matching your tier.
+Uncomment lines matching your tier: **Chat only** (default), **+GitHub**, or **+Pipeline**.
 
 ### 4. Add the component
 
-Create a client component (e.g., `components/FeedbackButton.tsx`):
-
 ```tsx
 'use client'
-
 import { useState } from 'react'
 import { FeedbackPanel } from '@nikitadmitrieff/feedback-chat'
 import '@nikitadmitrieff/feedback-chat/styles.css'
@@ -119,41 +145,25 @@ export function FeedbackButton() {
 }
 ```
 
-Then add it to your root layout:
+Add `<FeedbackButton />` to your root layout.
 
-```tsx
-import { FeedbackButton } from '@/components/FeedbackButton'
-
-// Inside <body>:
-<FeedbackButton />
-```
-
-### 5. Set environment variables
-
-Add to `.env.local`:
+### 5. Environment variables
 
 ```env
-# All tiers
 ANTHROPIC_API_KEY=sk-ant-...
 FEEDBACK_PASSWORD=your-password
-
-# +GitHub and +Pipeline — uncomment if applicable
-# GITHUB_TOKEN=ghp_...
-# GITHUB_REPO=owner/repo
-
-# +Pipeline only — set after deploying the agent
-# AGENT_URL=https://your-agent.railway.app
+# GITHUB_TOKEN=ghp_...       # +GitHub/+Pipeline (must be PAT, not gho_)
+# GITHUB_REPO=owner/repo     # +GitHub/+Pipeline
+# AGENT_URL=https://...      # +Pipeline only
 ```
 
 ### 6. Verify
 
-Run `npm run dev`, open your app, and click the feedback bar at the bottom of the screen. Enter your password and chat.
+`npm run dev` → click the feedback bar → enter password → chat.
 
 ---
 
-## +GitHub: Create labels
-
-If your tier includes GitHub, the widget needs these labels on your repo. If you have the `gh` CLI:
+## +GitHub: Create Labels
 
 ```bash
 gh label create feedback-bot --color 0E8A16 --description "Created by feedback widget" --force
@@ -164,71 +174,26 @@ gh label create preview-pending --color C5DEF5 --description "PR ready, preview 
 gh label create rejected --color E4E669 --description "User rejected changes" --force
 ```
 
-**Without `gh` CLI:** Create them manually at `github.com/OWNER/REPO/labels`.
-
-After creating labels, submit feedback through the widget — you should see issues appear with the `feedback-bot` label.
-
 ---
 
-## +Pipeline: Deploy the agent
+## +Pipeline: Deploy the Agent
 
-The agent is a separate Fastify server that listens for GitHub webhooks and uses Claude Code CLI to implement changes. You need to clone it, deploy it, and connect it to your repo.
-
-### Option A: Railway (recommended)
-
-**Requires:** `railway` CLI installed and logged in.
+### Railway
 
 ```bash
-# 1. Clone the agent
 git clone --depth 1 https://github.com/NikitaDmitrieff/feedback-chat
 cd feedback-chat/packages/agent
-
-# 2. Create project and deploy
-railway init
-railway up --detach
-
-# 3. Link the service (required before setting variables)
-railway service status --all          # note the service name
+railway init && railway up --detach
+railway service status --all          # note service name
 railway service link <service-name>
-
-# 4. Set env vars (batch them in one command)
-railway variables set \
-  GITHUB_TOKEN=ghp_... \
-  GITHUB_REPO=owner/repo \
-  WEBHOOK_SECRET=$(openssl rand -hex 32)
-
-# 5. Set Claude auth — pick one:
-# Max ($0/run):
-railway variables set CLAUDE_CREDENTIALS_JSON='...'
-# API key (pay per token):
-railway variables set ANTHROPIC_API_KEY=sk-ant-...
-
-# 6. Get the public URL
+railway variables set GITHUB_TOKEN=ghp_... GITHUB_REPO=owner/repo WEBHOOK_SECRET=$(openssl rand -hex 32)
+# Claude auth — pick one:
+railway variables set CLAUDE_CREDENTIALS_JSON='...'   # Max ($0/run)
+railway variables set ANTHROPIC_API_KEY=sk-ant-...     # API key (pay per token)
 railway domain
 ```
 
-> `railway domain` prints decorated output. Extract the clean URL with: `railway domain 2>&1 | grep -oE 'https://[^ ]+'`
-
-**Don't have `railway` CLI?** Install it with `npm install -g @railway/cli && railway login`. Or use Docker (below).
-
-#### Getting Claude Max credentials
-
-If you chose Max OAuth, extract and validate credentials using the built-in script:
-
-```bash
-cd packages/agent
-npm run credentials
-```
-
-This reads from your macOS keychain, validates the refresh token, and prints fresh `CLAUDE_CREDENTIALS_JSON` to stdout. Copy and pass it to Railway:
-
-```bash
-npm run credentials 2>/dev/null | pbcopy   # then paste into railway variables set
-```
-
-> **Tokens expire.** If the agent fails with `authentication_error`, re-run `npm run credentials` to get fresh tokens.
-
-### Option B: Docker
+### Docker
 
 ```bash
 cd packages/agent
@@ -236,15 +201,7 @@ docker build -t feedback-agent .
 docker run -p 3000:3000 --env-file .env feedback-agent
 ```
 
-Create a `.env` file with `GITHUB_TOKEN`, `GITHUB_REPO`, `WEBHOOK_SECRET`, and your Claude auth choice.
-
-The Dockerfile handles everything: TypeScript compilation, git/curl install, non-root user, and Claude CLI setup.
-
-### Connect the webhook
-
-After deploying, connect your GitHub repo to the agent.
-
-**With `gh` CLI:**
+### Webhook
 
 ```bash
 gh api repos/OWNER/REPO/hooks \
@@ -255,81 +212,20 @@ gh api repos/OWNER/REPO/hooks \
   -f 'events[]=issues'
 ```
 
-> `config[content_type]=json` is required. The default (`form-urlencoded`) causes 415 errors.
-
-**Without `gh` CLI:** Go to your repo Settings > Webhooks > Add webhook. Set the payload URL to `https://YOUR-AGENT-URL/webhook/github`, content type to `application/json`, the secret to your `WEBHOOK_SECRET`, and select only **Issues** events. The handler accepts `opened`, `reopened`, and `labeled` actions — so you can re-trigger the pipeline by toggling the `auto-implement` label.
-
-> **Vercel SSO warning:** If your Vercel project uses team SSO, `*.vercel.app` URLs return 401 for all unauthenticated requests (including webhooks). Use a custom domain to bypass this.
-
-### Finish up
-
-1. Add `AGENT_URL=https://your-agent-url` to your app's `.env.local`
-2. Uncomment `agentUrl` in your status route
-3. Verify the agent: `curl https://your-agent-url/health`
-4. Submit feedback — the PipelineTracker should show progression through: created, queued, running, validating, preview_ready
-
 ---
 
-## Automated setup
-
-### CLI wizard
+## Automated Setup
 
 ```bash
-npx feedback-chat init
+npx feedback-chat init            # Interactive wizard (routes, Tailwind, env, labels)
+npx feedback-chat deploy-agent    # Generates Railway deployment script
 ```
 
-Walks you through tier selection, creates API routes, configures Tailwind, sets up `.env.local`, creates the client component, and creates GitHub labels (if you have the `gh` CLI).
-
-### Agent deployment script
-
-```bash
-npx feedback-chat deploy-agent
-```
-
-Generates a self-contained bash script for Railway deployment. It reads your `.env.local`, asks for auth preferences, and outputs a script you can review before running.
-
-### Claude Code
-
-If you use [Claude Code](https://claude.ai/code), just say:
-
-> Install @nikitadmitrieff/feedback-chat — I want the [Chat / +GitHub / +Pipeline] tier
-
-See [`CLAUDE.md`](./CLAUDE.md) for the full installation spec.
+Or with [Claude Code](https://claude.ai/code): *"Install @nikitadmitrieff/feedback-chat — I want the +Pipeline tier"*
 
 ---
 
 ## Customization
-
-### System prompt
-
-```ts
-// Replace the default prompt entirely:
-createFeedbackHandler({
-  password: process.env.FEEDBACK_PASSWORD!,
-  systemPrompt: 'You are a helpful product advisor for Acme Corp...',
-})
-
-// Or inject context into the default prompt:
-createFeedbackHandler({
-  password: process.env.FEEDBACK_PASSWORD!,
-  projectContext: 'E-commerce platform with cart, checkout, and user accounts.',
-})
-```
-
-### AI model
-
-Any AI SDK-compatible model works. Default is Claude Haiku.
-
-```ts
-import { createAnthropic } from '@ai-sdk/anthropic'
-
-createFeedbackHandler({
-  password: process.env.FEEDBACK_PASSWORD!,
-  model: createAnthropic()('claude-sonnet-4-5-20250929'),
-})
-```
-
-### Full server config
 
 ```ts
 createFeedbackHandler({
@@ -337,75 +233,32 @@ createFeedbackHandler({
   model?: LanguageModel               // Default: claude-haiku-4-5-20251001
   systemPrompt?: string               // Replaces default prompt
   projectContext?: string             // Injected into default prompt
-  github?: {
-    token: string
-    repo: string
-    labels?: string[]                 // Extra labels beyond feedback-bot + auto-implement
-  }
+  github?: { token: string, repo: string, labels?: string[] }
 })
 
 createStatusHandler({
-  password: string                    // Required
+  password: string
   github?: { token: string, repo: string }
-  agentUrl?: string                   // Agent health endpoint for pipeline tracking
+  agentUrl?: string
 })
 ```
 
-### Client component
-
-`FeedbackPanel` has two props:
-
-```tsx
-<FeedbackPanel
-  isOpen={boolean}
-  onToggle={() => void}
-/>
-```
-
-That's it. No `statusUrl`, no `apiUrl` configuration needed — it defaults to `/api/feedback/chat` and pipeline tracking is handled internally by `PipelineTracker`.
+`FeedbackPanel` props: `isOpen: boolean`, `onToggle: () => void`. No other config needed.
 
 ---
 
 ## Troubleshooting
 
-| Problem | Cause | Fix |
-|---------|-------|-----|
-| Widget renders unstyled | Missing `@source` directive in `globals.css` | Add `@source "../node_modules/@nikitadmitrieff/feedback-chat/dist/**/*.js";` after `@import "tailwindcss"` |
-| Widget invisible | Missing styles import | Add `import '@nikitadmitrieff/feedback-chat/styles.css'` in your client component |
-| Build fails on React 19 | `@ai-sdk/react` excludes 19.1.0/19.1.1 | `npm install react@latest react-dom@latest` |
-| 401 on chat | Wrong password | Check `FEEDBACK_PASSWORD` in `.env.local` matches what you type |
-| Issues not created | Wrong token or missing config | Ensure `GITHUB_TOKEN` (`ghp_` prefix) and `GITHUB_REPO` are set, and `github` config is passed to handlers |
-| Issues silently stop working | `gho_` token expired | Replace with a PAT (`ghp_`) from [github.com/settings/tokens/new](https://github.com/settings/tokens/new) |
-| Pipeline stuck at "queued" | Agent not receiving webhooks | Check agent health (`curl .../health`), webhook config (Issues events, correct secret) |
-| Webhook returns 415 | Wrong content type | Recreate webhook with `config[content_type]=json` |
-| `railway variables set` fails | Service not linked | Run `railway up --detach` first, then `railway service link <name>` |
-| Agent: "Not logged in" | OAuth not configured | Set `CLAUDE_CREDENTIALS_JSON`, ensure Dockerfile has `hasCompletedOnboarding` |
-| Agent: "OAuth token expired" | Refresh token expired | Run `cd packages/agent && npm run credentials` to get fresh tokens, redeploy |
-| Webhook returns 401 on Vercel | Team SSO blocks `*.vercel.app` | Add a custom domain to your Vercel project |
-| Webhook 200 but no action | `labeled` event ignored | Update to latest — handler now accepts `labeled` with `auto-implement` |
-| Agent: "cannot use root" | Docker running as root | Dockerfile must create and switch to a non-root user |
-
-See [docs/troubleshooting.md](./docs/troubleshooting.md) for detailed solutions.
-
----
-
-## Agent env vars reference
-
-Set these on your **agent service** (Railway/Docker), not your Next.js app:
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GITHUB_TOKEN` | Yes | GitHub PAT (`ghp_` prefix), `repo` + `workflow` scopes |
-| `GITHUB_REPO` | Yes | Target repo (`owner/name`) |
-| `WEBHOOK_SECRET` | Yes | Random string for HMAC verification |
-| `CLAUDE_CREDENTIALS_JSON` | One of | Max OAuth credentials ($0/run) |
-| `ANTHROPIC_API_KEY` | One of | API key (pay per token) |
-| `AGENT_INSTALL_CMD` | No | Default: `npm ci` |
-| `AGENT_BUILD_CMD` | No | Default: `npm run build` |
-| `AGENT_LINT_CMD` | No | Default: `npm run lint` |
-| `AGENT_CLAUDE_TIMEOUT_MS` | No | Default: 900000 (15 min) |
-| `AGENT_JOB_BUDGET_MS` | No | Default: 1500000 (25 min) |
-| `PORT` | No | Default: 3000 |
+| Problem | Fix |
+|---------|-----|
+| Widget unstyled | Add `@source` directive in `globals.css` |
+| Widget invisible | Add `import '@nikitadmitrieff/feedback-chat/styles.css'` |
+| Build fails on React 19 | `npm install react@latest react-dom@latest` |
+| Issues not created | Check `GITHUB_TOKEN` is a PAT (`ghp_`), not OAuth (`gho_`) |
+| Pipeline stuck at "queued" | Check agent health, webhook config (Issues events, `content_type=json`) |
+| Agent auth error | Run `npm run credentials` (Max) or check `ANTHROPIC_API_KEY` |
+| Classification skipped | Set `ANTHROPIC_API_KEY` on the agent — OAuth tokens don't work for direct API calls |
+| Webhook 401 on Vercel | Team SSO blocks `*.vercel.app` — use a custom domain |
 
 ---
 
@@ -418,19 +271,6 @@ npm install
 npm run build
 npm run dev       # watch mode
 npm run test      # vitest
-```
-
-```
-feedback-chat/
-├── packages/
-│   ├── widget/   ← npm package (@nikitadmitrieff/feedback-chat)
-│   │   └── src/
-│   │       ├── client/   ← React components + hooks
-│   │       ├── server/   ← Route handler factories
-│   │       └── cli/      ← Setup wizard + deploy script
-│   └── agent/    ← Deployable Fastify service
-│       └── src/  ← Server, worker, webhook, OAuth
-└── docs/         ← Detailed guides
 ```
 
 ## License

@@ -9,6 +9,9 @@
     "start:legacy": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "credentials": "tsx src/credentials.ts",
+    "worker:local": "npm run build && node --env-file=.env dist/managed-worker.js",
+    "worker:pause-railway": "railway variables set WORKER_PAUSED=true",
+    "worker:resume-railway": "railway variables set WORKER_PAUSED=false",
     "test": "vitest run",
     "test:watch": "vitest"
   },
