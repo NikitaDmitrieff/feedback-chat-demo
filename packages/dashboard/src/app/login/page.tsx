@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic'
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Github, Loader2, MessageSquareText, Eye, EyeOff } from 'lucide-react'
+import { Github, Loader2, MessageSquare, Eye, EyeOff } from 'lucide-react'
 
 function LoginPage() {
   const [email, setEmail] = useState('')
@@ -60,13 +60,18 @@ function LoginPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="glass-card w-full max-w-sm p-8">
         {/* Branding */}
-        <div className="mb-8 flex flex-col items-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-elevated">
-            <MessageSquareText className="h-5 w-5 text-muted" />
+        <div className='mb-8 flex flex-col items-center'>
+          <div className='mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(94,158,255,0.12)] border border-[rgba(94,158,255,0.20)]'>
+            <MessageSquare className='h-5 w-5 text-[#5e9eff]' />
           </div>
-          <h1 className="text-base font-medium text-fg">Feedback Chat</h1>
-          <p className="mt-1 text-xs text-muted">
-            {mode === 'signup' ? 'Create your account' : 'Sign in to your dashboard'}
+          <p className='text-xs font-semibold tracking-wide text-[#5e9eff] uppercase mb-1'>feedback.chat</p>
+          <h1 className='text-base font-medium text-fg'>
+            {mode === 'signup' ? 'Create your account' : 'Welcome back'}
+          </h1>
+          <p className='mt-1 text-xs text-muted max-w-[200px] text-center leading-relaxed'>
+            {mode === 'signup'
+              ? 'Start turning feedback into shipped features'
+              : 'AI-powered feedback intelligence'}
           </p>
         </div>
 
