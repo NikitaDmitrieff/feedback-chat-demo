@@ -10,7 +10,7 @@ import { useConversations } from './use-conversations'
 import { ConversationTabs } from './conversation-tabs'
 import { PresentOptionsToolUI } from './present-options-tool-ui'
 import { SubmitRequestToolUI } from './submit-request-tool-ui'
-import { TooltipProvider } from './ui/tooltip'
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './ui/tooltip'
 import type { FeedbackPanelProps } from './types'
 
 const STORAGE_KEY = 'feedback_password'
@@ -56,6 +56,20 @@ export function FeedbackPanel({ isOpen, onToggle, apiUrl = '/api/feedback/chat' 
     return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [isOpen, onToggle])
 
+  // Keyboard shortcuts: Cmd/Ctrl+Shift+F to toggle, Escape to close
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
+        e.preventDefault()
+        onToggle()
+      } else if (e.key === 'Escape' && isOpen) {
+        onToggle()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onToggle, isOpen])
+
   function handleTriggerSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!triggerInput.trim()) return
@@ -99,14 +113,19 @@ export function FeedbackPanel({ isOpen, onToggle, apiUrl = '/api/feedback/chat' 
               <ArrowUp className="h-3.5 w-3.5 text-[#8b8d93]" />
             </button>
           </form>
-          <button
-            type="button"
-            onClick={onToggle}
-            className="feedback-trigger-button flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl"
-            aria-label="Open panel"
-          >
-            <PanelRight className="h-4 w-4" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onToggle}
+                className="feedback-trigger-button flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl"
+                aria-label="Open feedback (⌘⇧F)"
+              >
+                <PanelRight className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Open feedback (⌘⇧F)</TooltipContent>
+          </Tooltip>
           {pipelineActive && (
             <div className="flex h-[46px] w-[46px] shrink-0 items-center justify-center" title="Pipeline running">
               <span className="relative flex h-2.5 w-2.5">
