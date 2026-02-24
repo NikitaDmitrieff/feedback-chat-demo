@@ -7,6 +7,7 @@ import { RunsTable } from '@/components/runs-table'
 import { Github, Sparkles, Lightbulb, MessageSquare, ArrowRight } from 'lucide-react'
 import { DeleteProjectButton } from '@/components/delete-project-button'
 import { ProposalsCard } from '@/components/proposals-card'
+import { PipelineExplainer } from '@/components/pipeline-explainer'
 
 export default async function ProjectPage({
   params,
@@ -134,6 +135,13 @@ export default async function ProjectPage({
           </div>
         )
       })()}
+
+      {/* Pipeline explainer (shown when no runs yet) */}
+      {(runs ?? []).length === 0 && (
+        <div className="mb-8">
+          <PipelineExplainer />
+        </div>
+      )}
 
       {/* Runs table */}
       <div className="mb-8">

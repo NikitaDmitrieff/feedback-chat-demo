@@ -201,6 +201,35 @@ select.input-field {
 .flow-dot:nth-child(2) { animation-delay: 0.66s; }
 .flow-dot:nth-child(3) { animation-delay: 1.33s; }
 
+/* ── Pipeline explainer stage pulse ── */
+@keyframes pipeline-stage-pulse {
+  0% {
+    border-color: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.03);
+    box-shadow: none;
+  }
+  8% {
+    border-color: rgba(94, 158, 255, 0.45);
+    background: rgba(94, 158, 255, 0.07);
+    box-shadow: 0 0 18px rgba(94, 158, 255, 0.18);
+  }
+  18% {
+    border-color: rgba(94, 158, 255, 0.45);
+    background: rgba(94, 158, 255, 0.07);
+    box-shadow: 0 0 18px rgba(94, 158, 255, 0.18);
+  }
+  30% {
+    border-color: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.03);
+    box-shadow: none;
+  }
+  100% {
+    border-color: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.03);
+    box-shadow: none;
+  }
+}
+
 /* ── Slide-over backdrop ── */
 .slide-over-backdrop {
   position: fixed;
