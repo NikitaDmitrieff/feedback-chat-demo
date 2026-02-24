@@ -44,6 +44,8 @@
   --color-accent-foreground: #e8eaed;
   --color-destructive: #ef4444;
 
+  --spring: cubic-bezier(0.32, 0.72, 0, 1);
+
   color-scheme: dark;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   letter-spacing: -0.011em;

@@ -137,9 +137,18 @@ export function FeedbackPanel({ isOpen, onToggle, apiUrl = '/api/feedback/chat' 
         </div>
       </div>
 
+      {/* Backdrop */}
+      <div
+        className={`feedback-panel fixed inset-0 z-40 transition-opacity duration-300 ${
+          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
+        onClick={onToggle}
+      />
+
       <div
         ref={panelRef}
-        className={`feedback-panel fixed right-0 top-0 z-50 h-full p-3 transition-transform duration-300 ease-out ${
+        className={`feedback-panel fixed right-0 top-0 z-50 h-full p-3 transition-transform duration-[250ms] ease-[cubic-bezier(0.32,0.72,0,1)] ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
