@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, ExternalLink, GitPullRequest, AlertCircle, Globe } from 'lucide-react'
+import { ArrowLeft, ExternalLink, GitPullRequest, AlertCircle, Clock } from 'lucide-react'
 import { StageBadge } from '@/components/stage-badge'
 import { LogViewer } from '@/components/log-viewer'
 import { DeploymentPreview } from '@/components/deployment-preview'
@@ -70,14 +70,31 @@ export default async function RunDetailPage({
       </Link>
 
       {/* Header */}
-      <div className="mb-8 flex items-center gap-4">
-        <h1 className="text-lg font-medium text-fg">
-          Run <span className="font-[family-name:var(--font-mono)]">#{run.github_issue_number}</span>
-        </h1>
-        <StageBadge stage={run.stage} />
-        {duration && (
-          <span className="text-xs text-muted tabular-nums">{duration}</span>
-        )}
+      <div className="mb-8">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-lg font-medium text-fg">
+            Run <span className="font-[family-name:var(--font-mono)]">#{run.github_issue_number}</span>
+          </h1>
+          <StageBadge stage={run.stage} />
+          {run.github_pr_number && (
+            <a
+              href={`https://github.com/${project.github_repo}/pull/${run.github_pr_number}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent transition-colors hover:bg-accent/15"
+            >
+              <GitPullRequest className="h-3 w-3" />
+              PR #{run.github_pr_number}
+              <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+            </a>
+          )}
+          {duration && (
+            <span className="inline-flex items-center gap-1 text-xs text-muted tabular-nums">
+              <Clock className="h-3 w-3" />
+              {duration}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -92,7 +109,7 @@ export default async function RunDetailPage({
           {/* Deployment preview */}
           <div>
             <h2 className="mb-3 text-sm font-medium text-fg">Deployment Preview</h2>
-            <DeploymentPreview projectId={projectId} runId={runId} />
+            <DeploymentPreview projectId={projectId} runId={runId} stage={run.stage} />
           </div>
         </div>
 
