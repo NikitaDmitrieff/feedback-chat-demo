@@ -60,9 +60,21 @@ function SubmissionResult({ args, result }: SubmissionResultProps) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl bg-muted/50 px-3 py-2.5">
-        <p className="text-[13px] leading-relaxed">{args.summary}</p>
+      <div className="rounded-xl border border-border bg-muted/30 px-3 py-3 flex items-start gap-2.5">
+        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
+          <Check className="h-3 w-3 text-emerald-400" />
+        </div>
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-emerald-400/80 mb-1">Feature request captured</p>
+          <p className="text-[13px] leading-relaxed text-foreground">{args.summary}</p>
+        </div>
       </div>
+
+      {!result?.github_issue_url && result?.success && (
+        <p className="text-[11px] text-muted-foreground">
+          Feedback recorded. Connect GitHub to track implementation.
+        </p>
+      )}
 
       {result?.github_issue_url && (
         <PipelineTracker issueUrl={result.github_issue_url} />
@@ -91,7 +103,7 @@ function SubmissionResult({ args, result }: SubmissionResultProps) {
         </button>
         {promptExpanded && (
           <pre
-            className="max-h-40 overflow-auto border-t border-border bg-[#0a0a0a] px-3 py-2.5 text-[11px] leading-relaxed text-zinc-400"
+            className="max-h-40 overflow-auto border-t border-border bg-black/40 px-3 py-2.5 text-[11px] leading-relaxed text-zinc-400"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
             {args.generated_prompt}
