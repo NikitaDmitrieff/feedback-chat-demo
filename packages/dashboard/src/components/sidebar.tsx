@@ -8,10 +8,19 @@ import { FolderKanban, LayoutDashboard, MessageSquare, Bot, Settings, LogOut } f
 export function Sidebar() {
   const pathname = usePathname()
   const [expanded, setExpanded] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
   const collapseTimer = useRef<ReturnType<typeof setTimeout>>(null)
 
   const projectMatch = pathname.match(/\/projects\/([^/]+)/)
   const projectId = projectMatch && projectMatch[1] !== 'new' ? projectMatch[1] : null
+
+  useEffect(() => {
+    if (!projectId) return
+    fetch(`/api/proposals/${projectId}?status=draft`)
+      .then(r => r.json())
+      .then(data => setPendingCount(data.proposals?.length ?? 0))
+      .catch(() => {})
+  }, [projectId])
 
   const expand = useCallback(() => {
     if (collapseTimer.current) clearTimeout(collapseTimer.current)
@@ -89,7 +98,7 @@ export function Sidebar() {
       {projectId && (
         <Link
           href={`/projects/${projectId}/minions`}
-          className={`flex items-center rounded-[16px] transition-colors ${
+          className={`relative flex items-center rounded-[16px] transition-colors ${
             pathname.includes('/minions')
               ? 'bg-white/[0.08] text-fg'
               : 'text-muted hover:bg-white/[0.06] hover:text-fg'
@@ -98,7 +107,19 @@ export function Sidebar() {
           <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center">
             <Bot className="h-[15px] w-[15px]" />
           </div>
-          {expanded && <span className="truncate text-xs">Minions</span>}
+          {expanded && (
+            <div className="flex flex-1 items-center justify-between">
+              <span className="truncate text-xs">Minions</span>
+              {pendingCount > 0 && (
+                <span className="rounded-full bg-accent/20 px-1.5 text-[10px] font-semibold text-accent">
+                  {pendingCount}
+                </span>
+              )}
+            </div>
+          )}
+          {!expanded && pendingCount > 0 && (
+            <div className="absolute right-1 top-1 h-2 w-2 rounded-full bg-accent" />
+          )}
         </Link>
       )}
 
