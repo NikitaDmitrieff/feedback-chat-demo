@@ -8,6 +8,37 @@ import { FeedbackSlideOver } from '@/components/feedback-slide-over'
 import { TesterActivity } from '@/components/tester-activity'
 import type { FeedbackSession, FeedbackTheme, TesterSummary } from '@/lib/types'
 
+const THEME_COLORS = ['#5e9eff', '#f59e0b', '#10b981', '#8b5cf6', '#f43f5e', '#06b6d4']
+
+function ThemeChart({ themes }: { themes: FeedbackTheme[] }) {
+  const total = themes.reduce((s, t) => s + t.message_count, 0)
+  if (total === 0) return null
+
+  return (
+    <div className="glass-card p-4 mb-6">
+      <p className="text-xs font-medium text-muted mb-3 uppercase tracking-wider">Theme Distribution</p>
+      <div className="flex h-3 rounded-full overflow-hidden gap-px">
+        {themes.map((t, i) => (
+          <div
+            key={t.id}
+            style={{ width: `${(t.message_count / total) * 100}%`, backgroundColor: THEME_COLORS[i % THEME_COLORS.length] }}
+            title={`${t.name}: ${t.message_count} messages`}
+            className="hover:opacity-80 transition-opacity"
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-3 mt-3">
+        {themes.map((t, i) => (
+          <div key={t.id} className="flex items-center gap-1.5">
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: THEME_COLORS[i % THEME_COLORS.length] }} />
+            <span className="text-[11px] text-muted">{t.name} ({t.message_count})</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 type Props = {
   projectId: string
   githubRepo: string | null
@@ -46,6 +77,8 @@ export function FeedbackPageClient({ projectId, githubRepo, themes }: Props) {
   return (
     <>
       <DigestCard projectId={projectId} />
+
+      {themes.length > 0 && <ThemeChart themes={themes} />}
 
       <div className="mb-6 mt-6 flex items-center gap-1 rounded-lg bg-white/[0.04] p-1">
         <button
