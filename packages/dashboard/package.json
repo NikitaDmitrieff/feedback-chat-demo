@@ -10,6 +10,10 @@
     "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
+    "@nikitadmitrieff/feedback-chat": "*",
+    "@assistant-ui/react": "*",
+    "@assistant-ui/react-ai-sdk": "*",
+    "@assistant-ui/react-markdown": "*",
     "@ai-sdk/anthropic": "^3.0.44",
     "@anthropic-ai/sdk": "^0.78.0",
     "@octokit/app": "^16.1.2",

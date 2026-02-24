@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { MessageSquare, Github, Zap, Terminal, ArrowRight, Check } from 'lucide-react'
+import { DemoWidget } from '@/components/demo-widget'
 
 export default function Home() {
   return (
@@ -60,6 +61,54 @@ export default function Home() {
             <Github className="h-4 w-4" />
             View on GitHub
           </a>
+        </div>
+      </section>
+
+      {/* Live demo */}
+      <section className="px-6 pb-20 max-w-4xl mx-auto w-full">
+        <p className="text-center text-xs font-medium text-[var(--color-muted)] uppercase tracking-wider mb-4">
+          Try it now
+        </p>
+        <h2 className="text-center text-xl font-semibold text-[var(--color-fg)] mb-2">
+          Chat with the AI advisor
+        </h2>
+        <p className="text-center text-sm text-[var(--color-muted)] mb-10 max-w-lg mx-auto">
+          This is exactly what your users will see. Ask anything about feedback-chat or submit a feature idea.
+        </p>
+        <div className="flex flex-col md:flex-row items-start gap-10">
+          <div className="flex-1 space-y-6">
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="h-8 w-8 rounded-lg bg-[rgba(94,158,255,0.10)] flex items-center justify-center shrink-0">
+                  <MessageSquare className="h-4 w-4 text-[#5e9eff]" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-[var(--color-fg)]">Embedded widget</div>
+                  <div className="text-xs text-[var(--color-muted)]">Floats in your app, no page navigation</div>
+                </div>
+              </div>
+              <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                Drop it into any Next.js app in minutes. Your users can share ideas without leaving the page.
+              </p>
+            </div>
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="h-8 w-8 rounded-lg bg-[rgba(34,197,94,0.10)] flex items-center justify-center shrink-0">
+                  <Zap className="h-4 w-4 text-[#22c55e]" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-[var(--color-fg)]">AI-guided conversations</div>
+                  <div className="text-xs text-[var(--color-muted)]">Turns vague ideas into actionable specs</div>
+                </div>
+              </div>
+              <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                The advisor asks the right questions, then generates a precise prompt for your AI agent.
+              </p>
+            </div>
+          </div>
+          <div className="w-full md:w-[400px] shrink-0">
+            <DemoWidget />
+          </div>
         </div>
       </section>
 
