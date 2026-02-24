@@ -1,12 +1,38 @@
 # feedback-chat
 
-AI-powered feedback widget for Next.js. Users chat with an AI advisor, feedback becomes GitHub issues, an autonomous agent implements them, and the system learns from its own failures.
+[![npm](https://img.shields.io/npm/v/@nikitadmitrieff/feedback-chat)](https://www.npmjs.com/package/@nikitadmitrieff/feedback-chat)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+
+> **Turn user feedback into shipped features — automatically.**
+
+Users chat with an AI advisor. Feedback becomes a GitHub issue. An autonomous agent implements it, creates a PR, you approve. Done.
+
+[**Live Demo →**](https://loop.joincoby.com) · [**Dashboard →**](https://loop.joincoby.com) · [npm](https://www.npmjs.com/package/@nikitadmitrieff/feedback-chat)
+
+![Demo](docs/demo.gif)
+<!-- TODO: add screen recording showing: widget chat → GitHub issue → agent → PR → approve -->
+
+## How it works
 
 ```
-User chats → GitHub issue → Claude agent implements → PR → preview → approve
-                                    ↓ (on failure)
-                              Haiku classifies → self-improve job → fix PR
+┌─────────────┐     ┌──────────────┐     ┌───────────────────┐     ┌──────────────┐
+│  User chats │────▶│ AI creates   │────▶│  Claude agent     │────▶│ You approve  │
+│  in widget  │     │ GitHub issue │     │  writes the code  │     │    the PR    │
+└─────────────┘     └──────────────┘     └───────────────────┘     └──────────────┘
+                                                   │
+                                         On failure: Haiku
+                                         classifies → auto-fix PR
 ```
+
+## Tiers
+
+| Tier | What you get | Setup time |
+|------|-------------|-----------|
+| **Chat only** | AI conversations, localStorage | 5 minutes |
+| **+GitHub** | Chat + auto-creates issues | 10 minutes |
+| **+Pipeline** | Full autonomous implementation | 30 minutes |
+
+---
 
 ## Quick Actions
 
@@ -259,6 +285,18 @@ createStatusHandler({
 | Agent auth error | Run `npm run credentials` (Max) or check `ANTHROPIC_API_KEY` |
 | Classification skipped | Set `ANTHROPIC_API_KEY` on the agent — OAuth tokens don't work for direct API calls |
 | Webhook 401 on Vercel | Team SSO blocks `*.vercel.app` — use a custom domain |
+
+---
+
+## Demo Walkthrough (3 minutes)
+
+1. **Landing page** (30s) — Open loop.joincoby.com, explain what you're looking at
+2. **Widget** (30s) — Click the feedback bar at bottom-center, enter password, send "I wish the app had dark mode"
+3. **AI responds** (30s) — Watch the AI refine the idea, click "Submit as feature request"
+4. **Pipeline** (45s) — Show the PipelineTracker: created → queued → running → preview_ready
+5. **Dashboard** (30s) — Open the Minions tab, show the Kanban with active run
+6. **Approve** (15s) — Click Approve on the preview, show it moves to "Deployed"
+7. **Proposals** (15s) — Show the AI Strategist tab with auto-generated improvement proposals
 
 ---
 
