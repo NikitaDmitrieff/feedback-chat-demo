@@ -206,6 +206,26 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Stats / trust strip */}
+      <section className="px-6 pb-16 max-w-4xl mx-auto w-full">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-16">
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-3xl font-semibold text-[#5e9eff]">3</span>
+            <span className="text-xs text-[var(--color-muted)]">tiers — from chat-only to full pipeline</span>
+          </div>
+          <div className="hidden sm:block h-8 w-px bg-white/[0.06]" />
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-3xl font-semibold text-[#5e9eff]">1</span>
+            <span className="text-xs text-[var(--color-muted)]">npm install — drop-in widget</span>
+          </div>
+          <div className="hidden sm:block h-8 w-px bg-white/[0.06]" />
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-3xl font-semibold text-[#5e9eff]">100%</span>
+            <span className="text-xs text-[var(--color-muted)]">open source — MIT licensed</span>
+          </div>
+        </div>
+      </section>
+
       {/* 3-tier grid */}
       <section className="px-6 pb-20 max-w-4xl mx-auto w-full">
         <p className="text-center text-xs font-medium text-[var(--color-muted)] uppercase tracking-wider mb-10">
@@ -305,22 +325,29 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Closing CTA */}
+      <section className="text-center px-6 pb-16 mt-8">
+        <h2 className="text-2xl font-semibold text-[var(--color-fg)] mb-3">Ready to ship faster?</h2>
+        <p className="text-sm text-[var(--color-muted)] mb-6">Set up takes under 5 minutes. No servers required for the chat tier.</p>
+        <Link href="/projects" className="btn-primary rounded-xl px-8 py-3 text-sm font-medium inline-flex items-center gap-2">
+          Open Dashboard <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </section>
+
       {/* Footer */}
-      <footer className="border-t border-white/[0.04] py-8 px-6 mt-auto">
-        <div className="max-w-4xl mx-auto flex items-center justify-between text-xs text-[var(--color-muted)]">
-          <span>feedback.chat</span>
-          <div className="flex items-center gap-6">
-            <a
-              href="https://github.com/NikitaDmitrieff/feedback-chat"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-[var(--color-fg)] transition-colors"
-            >
-              GitHub
-            </a>
-            <Link href="/projects" className="hover:text-[var(--color-fg)] transition-colors">
-              Dashboard
-            </Link>
+      <footer className="border-t border-white/[0.04] px-8 py-8 mt-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-md bg-[rgba(94,158,255,0.15)] flex items-center justify-center">
+              <MessageSquare className="h-3 w-3 text-[#5e9eff]" />
+            </div>
+            <span className="text-sm font-semibold text-[var(--color-fg)]">feedback.chat</span>
+            <span className="text-xs text-[var(--color-muted)]">MIT License</span>
+          </div>
+          <div className="flex items-center gap-6 text-xs text-[var(--color-muted)]">
+            <a href="https://github.com/NikitaDmitrieff/feedback-chat" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-fg)] transition-colors">GitHub</a>
+            <a href="https://www.npmjs.com/package/@nikitadmitrieff/feedback-chat" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-fg)] transition-colors">npm</a>
+            <Link href="/projects" className="hover:text-[var(--color-fg)] transition-colors">Dashboard</Link>
           </div>
         </div>
       </footer>
