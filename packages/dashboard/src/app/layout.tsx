@@ -15,7 +15,22 @@ const jetbrains = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Feedback Chat — Dashboard',
+  title: 'feedback.chat — AI Feedback Intelligence',
+  description: 'Turn user feedback into shipped features automatically. AI refines ideas into GitHub issues, your agent implements them, you approve the PR.',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+  },
+  openGraph: {
+    title: 'feedback.chat — AI Feedback Intelligence',
+    description: 'Turn user feedback into shipped features automatically.',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'feedback.chat',
+    description: 'Turn user feedback into shipped features automatically.',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

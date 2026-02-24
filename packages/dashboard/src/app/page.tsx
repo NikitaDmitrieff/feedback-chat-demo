@@ -1,6 +1,22 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { MessageSquare, Github, Zap, Terminal, ArrowRight, Check } from 'lucide-react'
 import { DemoWidget } from '@/components/demo-widget'
+
+export const metadata: Metadata = {
+  title: 'feedback.chat — Turn User Feedback into Shipped Features',
+  description: 'AI-powered feedback widget for Next.js. Chat with users, auto-create GitHub issues, and let your agent implement features automatically.',
+  openGraph: {
+    title: 'feedback.chat — Turn User Feedback into Shipped Features',
+    description: 'AI-powered feedback widget for Next.js. Chat with users, auto-create GitHub issues, and let your agent implement features automatically.',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'feedback.chat',
+    description: 'AI-powered feedback widget for Next.js. Feedback → Issue → PR. Automatic.',
+  },
+}
 
 export default function Home() {
   return (
