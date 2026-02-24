@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { DefaultChatTransport } from 'ai'
-import { AssistantRuntimeProvider, useThreadRuntime } from '@assistant-ui/react'
+import { AssistantRuntimeProvider, useThreadRuntime, useAui, Suggestions } from '@assistant-ui/react'
 import { useChatRuntime } from '@assistant-ui/react-ai-sdk'
 import { ArrowUp, PanelRight, X, AlertCircle, ArrowRight, Loader2, Lightbulb } from 'lucide-react'
 import { Thread } from './thread'
@@ -174,8 +174,17 @@ function ChatContent({
     }),
   })
 
+  const aui = useAui({
+    suggestions: Suggestions([
+      "The checkout flow is confusing",
+      "I'd love dark mode",
+      "The search results are irrelevant",
+      "Can you add keyboard shortcuts?",
+    ]),
+  })
+
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
+    <AssistantRuntimeProvider runtime={runtime} aui={aui}>
       <ConversationManager
         isOpen={isOpen}
         onClose={onClose}
