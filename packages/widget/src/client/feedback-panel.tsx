@@ -299,11 +299,18 @@ function PasswordGate({ onAuth, onClose, apiUrl }: { onAuth: () => void; onClose
       >
         <X className="h-3.5 w-3.5" />
       </button>
-      <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-        <Lightbulb className="h-6 w-6 text-muted-foreground" />
+
+      <p className="mb-5 text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'rgba(139,141,147,0.5)' }}>
+        feedback
+      </p>
+
+      <div className="feedback-gate-orb mb-5">
+        <Lightbulb className="h-5 w-5" style={{ color: 'rgba(255,255,255,0.65)' }} />
       </div>
+
+      <h2 className="mb-1 text-[15px] font-semibold text-foreground">Welcome.</h2>
       <p className="mb-8 text-center text-sm text-muted-foreground">
-        Share your ideas to improve the app
+        Share your ideas and help us improve.
       </p>
 
       {error && (
@@ -324,7 +331,7 @@ function PasswordGate({ onAuth, onClose, apiUrl }: { onAuth: () => void; onClose
           aria-label="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+          className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
         />
         <button
           type="submit"
@@ -365,12 +372,20 @@ function NameGate({ onName, onClose }: { onName: (name: string) => void; onClose
       >
         <X className="h-3.5 w-3.5" />
       </button>
-      <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-        <Lightbulb className="h-6 w-6 text-muted-foreground" />
-      </div>
-      <p className="mb-8 text-center text-sm text-muted-foreground">
-        What should we call you?
+
+      <p className="mb-5 text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'rgba(139,141,147,0.5)' }}>
+        feedback
       </p>
+
+      <div className="feedback-gate-orb mb-5">
+        <Lightbulb className="h-5 w-5" style={{ color: 'rgba(255,255,255,0.65)' }} />
+      </div>
+
+      <h2 className="mb-1 text-[15px] font-semibold text-foreground">What should we call you?</h2>
+      <p className="mb-8 text-center text-sm text-muted-foreground">
+        We'll use your name to identify your feedback.
+      </p>
+
       <form onSubmit={handleSubmit} className="w-full space-y-3">
         <input
           type="text"
@@ -379,7 +394,7 @@ function NameGate({ onName, onClose }: { onName: (name: string) => void; onClose
           aria-label="Your name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+          className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
         />
         <button
           type="submit"
