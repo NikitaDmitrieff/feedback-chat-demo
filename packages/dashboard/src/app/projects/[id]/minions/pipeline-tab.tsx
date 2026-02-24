@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Lightbulb,
@@ -63,6 +63,16 @@ function elapsed(start: string, end?: string | null): string {
   const m = Math.floor(s / 60)
   if (m < 60) return `${m}m ${s % 60}s`
   return `${Math.floor(m / 60)}h ${m % 60}m`
+}
+
+function ElapsedTimer({ startedAt, completedAt }: { startedAt: string; completedAt?: string | null }) {
+  const [, tick] = useState(0)
+  useEffect(() => {
+    if (completedAt) return
+    const id = setInterval(() => tick((n: number) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [completedAt])
+  return <>{elapsed(startedAt, completedAt)}</>
 }
 
 function StageBadge({ stage, result }: { stage: string; result: string | null }) {
@@ -210,8 +220,12 @@ export function PipelineTab({ projectId, githubRepo, proposals: initialProposals
             {/* Active proposals */}
             {activeProposals.map(p => {
               const run = p.github_issue_number ? runByIssue.get(p.github_issue_number) : null
+              const isRunning = run && !run.result
               return (
-                <div key={p.id} className="glass-card p-3">
+                <div
+                  key={p.id}
+                  className={`glass-card p-3 transition-shadow${isRunning ? ' shadow-[0_0_20px_rgba(94,158,255,0.08)]' : ''}`}
+                >
                   <button
                     onClick={() => setSelected(p)}
                     className="flex w-full items-center justify-between text-left"
@@ -227,7 +241,7 @@ export function PipelineTab({ projectId, githubRepo, proposals: initialProposals
                   )}
                   {run && (
                     <div className="mt-1.5 text-[11px] text-muted">
-                      {elapsed(run.started_at, run.completed_at)} elapsed
+                      <ElapsedTimer startedAt={run.started_at} completedAt={run.completed_at} /> elapsed
                     </div>
                   )}
                   {/* Expandable log tail */}
@@ -262,14 +276,14 @@ export function PipelineTab({ projectId, githubRepo, proposals: initialProposals
               <Link
                 key={r.id}
                 href={`/projects/${projectId}/runs/${r.id}`}
-                className="glass-card block p-3 transition-colors hover:bg-white/[0.06]"
+                className="glass-card block p-3 shadow-[0_0_20px_rgba(94,158,255,0.08)] transition-colors hover:bg-white/[0.06]"
               >
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-fg">Issue #{r.github_issue_number}</p>
                   <StageBadge stage={r.stage} result={r.result} />
                 </div>
                 <div className="mt-1.5 text-[11px] text-muted">
-                  {elapsed(r.started_at)} elapsed
+                  <ElapsedTimer startedAt={r.started_at} /> elapsed
                 </div>
               </Link>
             ))}

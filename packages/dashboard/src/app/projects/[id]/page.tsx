@@ -145,7 +145,24 @@ export default async function ProjectPage({
 
       {/* Runs table */}
       <div className="mb-8">
-        <h2 className="mb-4 text-sm font-medium text-fg">Pipeline Runs</h2>
+        {(() => {
+          const ACTIVE_STAGES = new Set(['running', 'validating', 'queued'])
+          const hasActiveRuns = (runs ?? []).some(r => !r.result && ACTIVE_STAGES.has(r.stage))
+          return (
+            <div className="mb-4 flex items-center gap-2">
+              <h2 className="text-sm font-medium text-fg">Pipeline Runs</h2>
+              {hasActiveRuns && (
+                <span className="flex items-center gap-1.5 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+                  </span>
+                  Live
+                </span>
+              )}
+            </div>
+          )
+        })()}
         <RunsTable runs={enrichedRuns} githubRepo={project.github_repo} projectId={project.id} />
       </div>
     </div>
