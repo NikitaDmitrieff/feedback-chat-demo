@@ -87,10 +87,10 @@ const ThreadWelcome: FC = () => {
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
         <div className="aui-thread-welcome-message flex size-full flex-col items-center justify-center gap-1 px-4 text-center">
           <h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-sm font-medium text-foreground duration-200">
-            Share an idea
+            What can we improve?
           </h1>
           <p className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-muted-foreground text-xs delay-75 duration-200">
-            Describe what you&apos;d like to improve.
+            Share a bug, idea, or anything on your mind.
           </p>
         </div>
       </div>
