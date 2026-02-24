@@ -153,24 +153,40 @@ export function FeedbackPanel({ isOpen, onToggle, apiUrl = '/api/feedback/chat' 
         }`}
       >
         <div className="flex h-full w-[400px] flex-col text-foreground">
-          {authenticated && testerName ? (
-            <ChatContent
-              isOpen={isOpen}
-              onClose={onToggle}
-              pendingMessage={pendingMessage}
-              onPendingMessageSent={clearPendingMessage}
-              apiUrl={apiUrl}
-              testerName={testerName}
-            />
-          ) : authenticated && !testerName ? (
-            <div className="feedback-panel-glass flex h-full flex-col overflow-hidden">
-              <NameGate onName={setTesterName} onClose={onToggle} />
-            </div>
-          ) : (
-            <div className="feedback-panel-glass flex h-full flex-col overflow-hidden">
-              <PasswordGate onAuth={() => setAuthenticated(true)} onClose={onToggle} apiUrl={apiUrl} />
-            </div>
-          )}
+          <div className="flex-1 min-h-0">
+            {authenticated && testerName ? (
+              <ChatContent
+                isOpen={isOpen}
+                onClose={onToggle}
+                pendingMessage={pendingMessage}
+                onPendingMessageSent={clearPendingMessage}
+                apiUrl={apiUrl}
+                testerName={testerName}
+              />
+            ) : authenticated && !testerName ? (
+              <div className="feedback-panel-glass flex h-full flex-col overflow-hidden">
+                <NameGate onName={setTesterName} onClose={onToggle} />
+              </div>
+            ) : (
+              <div className="feedback-panel-glass flex h-full flex-col overflow-hidden">
+                <PasswordGate onAuth={() => setAuthenticated(true)} onClose={onToggle} apiUrl={apiUrl} />
+              </div>
+            )}
+          </div>
+          {/* Footer attribution */}
+          <div className='flex items-center justify-center py-2 border-t border-white/[0.04]'>
+            <a
+              href='https://github.com/NikitaDmitrieff/feedback-chat'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='flex items-center gap-1.5 text-[10px] text-white/25 transition-colors hover:text-white/50'
+            >
+              <svg width='10' height='10' viewBox='0 0 24 24' fill='none' className='shrink-0'>
+                <path d='M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'/>
+              </svg>
+              powered by feedback.chat
+            </a>
+          </div>
         </div>
       </div>
     </TooltipProvider>
